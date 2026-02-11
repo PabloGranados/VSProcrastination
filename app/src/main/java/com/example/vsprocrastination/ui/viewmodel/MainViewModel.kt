@@ -22,6 +22,7 @@ import com.example.vsprocrastination.domain.TaskStats
 import com.example.vsprocrastination.service.AppLeaveDetector
 import com.example.vsprocrastination.service.DeadlineCountdownWorker
 import com.example.vsprocrastination.service.FocusService
+import com.example.vsprocrastination.service.SmartNotificationWorker
 import com.example.vsprocrastination.service.TaskReminderWorker
 import com.example.vsprocrastination.service.TimerState
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -200,6 +201,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Countdown estilo Duolingo para tareas a <2h del deadline
         DeadlineCountdownWorker.createNotificationChannel(context)
         DeadlineCountdownWorker.schedule(context)
+        // Sistema de notificaciones inteligente basado en ciencia conductual
+        SmartNotificationWorker.schedule(context)
     }
     
     /**
@@ -623,7 +626,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     syncManager.syncAll()
                     preferencesManager.setLastSyncTimestamp()
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    android.util.Log.w("MainViewModel", "Auto-sync failed", e)
+                }
             }
         }
     }

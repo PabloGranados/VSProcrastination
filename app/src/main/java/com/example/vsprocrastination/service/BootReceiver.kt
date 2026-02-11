@@ -19,6 +19,13 @@ class BootReceiver : BroadcastReceiver() {
             
             // Reprogramar recordatorios periódicos
             TaskReminderWorker.schedulePeriodicReminder(context)
+            
+            // Reprogramar notificaciones inteligentes
+            SmartNotificationWorker.schedule(context)
+            
+            // Reprogramar countdown de deadlines
+            DeadlineCountdownWorker.createNotificationChannel(context)
+            DeadlineCountdownWorker.schedule(context)
         }
     }
 }

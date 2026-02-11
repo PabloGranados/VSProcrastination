@@ -98,6 +98,18 @@ fun WeeklySummaryScreen(
                 }
             }
             
+            // Calendario de contribuciones estilo GitHub
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    ContributionCalendar(
+                        tasks = tasks
+                    )
+                }
+            }
+            
             // Racha
             Card(
                 modifier = Modifier.fillMaxWidth(),

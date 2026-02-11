@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.*
 import com.example.vsprocrastination.MainActivity
 import com.example.vsprocrastination.R
+import com.example.vsprocrastination.data.database.AppDatabase
 import java.util.concurrent.TimeUnit
 
 /**
@@ -30,7 +31,7 @@ import java.util.concurrent.TimeUnit
 class TaskReminderWorker(
     context: Context,
     params: WorkerParameters
-) : Worker(context, params) {
+) : CoroutineWorker(context, params) {
     
     companion object {
         const val CHANNEL_ID = "task_reminder_channel"
@@ -186,11 +187,27 @@ class TaskReminderWorker(
         }
     }
     
-    override fun doWork(): Result {
-        val taskName = inputData.getString(KEY_TASK_NAME) ?: "tu tarea más importante"
+    override suspend fun doWork(): Result {
+        var taskName = inputData.getString(KEY_TASK_NAME)
         val taskId = inputData.getLong(KEY_TASK_ID, 0)
         val isOverdue = inputData.getBoolean(KEY_IS_OVERDUE, false)
         val type = inputData.getString(KEY_NOTIFICATION_TYPE) ?: TYPE_GENTLE
+        
+        // Si no se proporcionó nombre de tarea, obtener la tarea prioritaria de la BD
+        if (taskName.isNullOrEmpty() || taskName == "tu tarea más importante") {
+            try {
+                val db = AppDatabase.getDatabase(applicationContext)
+                val pendingTasks = db.taskDao().getAllTasksSync()
+                    .filter { !it.isCompleted }
+                val topTask = pendingTasks.maxByOrNull { it.calculatePriorityScore() }
+                taskName = topTask?.name ?: run {
+                    // No hay tareas pendientes — no notificar
+                    return Result.success()
+                }
+            } catch (e: Exception) {
+                taskName = "tu tarea más importante"
+            }
+        }
         
         when (type) {
             TYPE_GENTLE -> showGentleNotification(taskName, taskId)
@@ -202,12 +219,22 @@ class TaskReminderWorker(
     }
     
     /**
-     * Notificación suave - se puede descargar.
+     * Notificación suave - mejorada con dato científico y nombre de tarea específico.
      */
     private fun showGentleNotification(taskName: String, taskId: Long) {
+        val scienceTips = listOf(
+            "\n\n💡 Solo 2 minutos para empezar. La inercia cognitiva se rompe al iniciar (Newton, 1687 — sí, también aplica a la mente).",
+            "\n\n🧠 Tu cerebro libera dopamina al completar tareas. Cada \u2705 te motiva más (Schultz, 1997).",
+            "\n\n⚡ Efecto Zeigarnik: Las tareas empezadas se quedan en tu mente. Empiézala y tu cerebro te ayudará a terminarla.",
+            "\n\n📊 Las personas que actúan en los primeros 5 segundos de un impulso tienen 3x más probabilidad de completar la tarea (Robbins, 2017)."
+        )
+        
         val notification = baseNotificationBuilder(CHANNEL_ID, taskId)
-            .setContentTitle("📋 ¿Ya empezaste?")
-            .setContentText(taskName)
+            .setContentTitle("🎯 Tu siguiente tarea: $taskName")
+            .setContentText("¿Puedes dedicarle 2 minutos ahora?")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                "📌 $taskName\n\n¿Puedes dedicarle 2 minutos ahora? A veces eso es todo lo que necesitas para entrar en ritmo.${scienceTips.random()}"
+            ))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
@@ -216,15 +243,14 @@ class TaskReminderWorker(
     }
     
     /**
-     * Notificación persistente - NO se puede descartar con swipe.
-     * Solo desaparece cuando el usuario actúa.
+     * Notificación persistente - con nombre específico y motivación científica.
      */
     private fun showPersistentNotification(taskName: String, taskId: Long, isOverdue: Boolean) {
         val title = if (isOverdue) "⚠️ ¡TAREA VENCIDA!" else "🎯 Es hora de actuar"
         val text = if (isOverdue) {
-            "$taskName ya pasó su fecha límite. Ábrela AHORA."
+            "🚨 \"$taskName\" ya pasó su fecha límite.\n\n🧠 Dato: Retrasar tareas vencidas aumenta la ansiedad exponencialmente (Steel, 2007). Empieza ahora — solo 2 minutos."
         } else {
-            "Tu próxima tarea: $taskName. Toca para empezar."
+            "📌 Tu próxima tarea: $taskName\n\n💡 Brian Tracy: \u00abSi tienes que comerte dos sapos, cométe el más grande primero.\u00bb Toca para empezar."
         }
         
         val notification = baseNotificationBuilder(CHANNEL_ID, taskId)

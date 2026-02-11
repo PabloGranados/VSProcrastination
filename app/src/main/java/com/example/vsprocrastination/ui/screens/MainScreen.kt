@@ -181,9 +181,49 @@ private fun MainContent(
             Spacer(modifier = Modifier.height(12.dp))
         }
         
-        // Sección de progreso
+        // Calendario de contribuciones (estilo GitHub)
         item {
-            ProgressSection(uiState)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    ContributionCalendar(
+                        tasks = uiState.allTasks
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Mini stats compactos debajo del calendario
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Hoy: ${uiState.stats.completedTodayCount}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Semana: ${uiState.stats.completedThisWeekCount}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Total: ${uiState.stats.totalCompletedCount}/${uiState.stats.totalTasksCount}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
         }
         
@@ -525,80 +565,7 @@ private fun PriorityBadge(priority: Priority) {
     }
 }
 
-/**
- * Sección de progreso resumida.
- */
-@Composable
-private fun ProgressSection(uiState: MainUiState) {
-    val stats = uiState.stats
-    val completionPercent = (stats.completionRate * 100).toInt()
-    
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "📊 Tu Progreso",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "$completionPercent%",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            LinearProgressIndicator(
-                progress = { stats.completionRate },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Hoy: ${stats.completedTodayCount}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Semana: ${stats.completedThisWeekCount}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Total: ${stats.totalCompletedCount}/${stats.totalTasksCount}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
+// ProgressSection reemplazada por ContributionCalendar integrado directamente en MainContent
 
 /**
  * Item de tarea secundaria con badge de dificultad y edición al tocar.

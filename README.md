@@ -1,18 +1,37 @@
 # VS Procrastination
 
-**v2.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.1** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
 
 ## Descargar APK
 
-📲 **[Descargar VS Procrastination v2.0](releases/VS-Procrastination-v2.0.apk)**
+📲 **[Descargar VS Procrastination v2.1](releases/VS-Procrastination-v2.1.apk)**
 
 > Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
 
-## Novedades en v2.0
+## Novedades en v2.1
 
-### 🔄 Sincronización entre dispositivos
+### 📅 Calendario de contribuciones (estilo GitHub)
+- **Grid visual de actividad** de las últimas 15 semanas con cuadros coloreados en 5 niveles de verde
+- Toca cualquier día para ver **los nombres de las tareas** que completaste ese día
+- Borde especial destaca el día de hoy y leyenda de colores (Menos → Más)
+- Reemplaza la barra de progreso genérica en la pantalla principal
+- También aparece en el Resumen Semanal para ver el historial completo
+- Justificación: "Don't Break the Chain" (Seinfeld) + Tiny Habits (B.J. Fogg)
+
+### 🔔 Sistema de notificaciones inteligente
+- **Notificaciones basadas en ritmo circadiano**: diferentes mensajes según la hora del día
+  - **Mañana (8-10h)**: Arrancada con la tarea prioritaria + dato sobre cortisol/deep work
+  - **Mediodía (12-14h)**: Motivación para tareas rápidas durante la caída post-prandial
+  - **Tarde (16-18h)**: Revisión del progreso + segundo pico de energía
+  - **Noche (20-22h)**: Reflexión + incentivo para planificar el día siguiente
+- **Protección de racha**: si llevas 2+ días y no has completado nada hoy, aviso urgente
+- **Alertas de deadline**: notificación inmediata si hay tareas venciendo en <4 horas
+- Cada notificación incluye **datos científicos reales** (Pychyl, Steel, Baumeister, Gollwitzer, Kahneman)
+- Los recordatorios periódicos ahora muestran **el nombre exacto de tu tarea prioritaria** en vez de texto genérico
+
+### 🔄 Sincronización entre dispositivos (v2.0)
 - **Tus tareas en todos tus dispositivos**: celular, tablet, cualquier Android
 - Inicia sesión con Google y tus tareas se sincronizan automáticamente
 - Sincronización al abrir la app y al hacer cambios (crear, editar, completar, eliminar)
@@ -53,6 +72,9 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 | Implementation Intentions (Gollwitzer) | Notificaciones contextuales que anclan la tarea al momento presente |
 | Ley de Fogg | Entrada de tareas con mínima fricción |
 | Ley de Hick | Máximo 3-4 opciones en cada selector |
+| Don't Break the Chain (Seinfeld) | Calendario de contribuciones estilo GitHub con historial de 15 semanas |
+| Ritmos Circadianos | Notificaciones adaptadas a la hora del día (cortisol matutino, bajón post-prandial, pico vespertino) |
+| Planning Fallacy (Kahneman) | Reflexión nocturna para planificar el día siguiente |
 
 ## Features
 
@@ -74,18 +96,23 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 - Detección de salida de la app durante sesión activa con notificación para que vuelvas
 - Registro automático del tiempo trabajado por tarea
 
-### Notificaciones
+### Notificaciones inteligentes
 
-- Recordatorio periódico cada 2 horas vía WorkManager
+- **Sistema circadiano**: notificaciones adaptadas a la hora del día (mañana, mediodía, tarde, noche) con contenido científico específico
+- Recordatorio periódico cada 2 horas con **el nombre real de tu tarea prioritaria** (ya no dice genérico)
 - Notificaciones persistentes (no se descartan con swipe)
 - Modo nagging cada 15 minutos para tareas vencidas, con mensajes directos y rotantes
 - Recordatorio 1 hora antes del deadline
 - **Countdown estilo Duolingo**: cuando una tarea está a menos de 2 horas de vencer, aparece una notificación con cronómetro regresivo en tiempo real que cuenta atrás hasta el deadline. Se vuelve pegajosa cuando quedan menos de 30 minutos.
+- Protección de racha: aviso urgente si tienes racha activa y no has completado nada hoy
+- Alertas de deadline inminente (<4 horas) con motivación contextual
+- Datos científicos integrados en cada notificación (Steel, Pychyl, Baumeister, Gollwitzer, Kahneman)
 - Reprogramación automática tras reinicio del dispositivo
 
 ### Rachas y motivación
 
 - Racha de días consecutivos completando al menos una tarea
+- Calendario de contribuciones también visible en el Resumen Semanal
 - Animación de celebración al completar una tarea (confeti)
 - Frases motivacionales contextuales: cambian según si la tarea es difícil, rápida, si llevas racha, o si hay tareas vencidas
 - Resumen semanal con estadísticas, reflexión adaptativa y datos curiosos sobre procrastinación
@@ -98,9 +125,12 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 - Sincronización con Google (nuevo en v2.0)
 - Limpiar tareas completadas
 
-### Progreso
+### Progreso y calendario
 
-- Barra de progreso global con porcentaje
+- **Calendario de contribuciones estilo GitHub** con 15 semanas de historial
+- Cuadros coloreados en 5 niveles de verde según tareas completadas por día
+- Detalle al tocar un día: muestra los nombres de las tareas completadas
+- Borde especial para el día actual
 - Contadores: tareas completadas hoy, esta semana, total pendientes
 - Indicador de tareas vencidas
 - Racha actual y mejor racha
@@ -145,13 +175,15 @@ app/src/main/java/com/example/vsprocrastination/
 │   └── MotivationalPhrases.kt   # Frases contextuales por categoría
 ├── service/
 │   ├── FocusService.kt          # Foreground Service (Pomodoro + cronómetro nativo)
-│   ├── TaskReminderWorker.kt    # WorkManager (3 niveles de notificación)
+│   ├── TaskReminderWorker.kt    # WorkManager (3 niveles de notificación + consulta BD)
+│   ├── SmartNotificationWorker.kt # Notificaciones circadianas basadas en ciencia
 │   ├── DeadlineCountdownWorker.kt # Countdown <2h estilo Duolingo
 │   ├── AppLeaveDetector.kt      # BroadcastReceiver (salida de app)
 │   └── BootReceiver.kt          # Reprograma workers tras reboot
 ├── ui/
 │   ├── screens/
 │   │   ├── MainScreen.kt        # Pantalla principal
+│   │   ├── ContributionCalendar.kt # Calendario de actividad estilo GitHub
 │   │   ├── SettingsScreen.kt    # Configuración
 │   │   └── WeeklySummaryScreen.kt # Resumen semanal
 │   ├── viewmodel/
@@ -180,6 +212,15 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 
 ## Changelog
 
+### v2.1 (febrero 2026)
+- Calendario de contribuciones estilo GitHub con 15 semanas de historial
+- Detalle de tareas completadas por día al tocar el calendario
+- Sistema de notificaciones inteligente basado en ritmo circadiano
+- Notificaciones muestran el nombre real de la tarea prioritaria
+- SmartNotificationWorker con motivación científica según hora del día
+- Protección de racha y alertas de deadline inminente
+- Reemplazada barra de progreso genérica por el calendario en pantalla principal
+
 ### v2.0 (febrero 2026)
 - Sincronización entre dispositivos con Firebase (Auth + Firestore)
 - Google Sign-In para vincular cuenta
@@ -207,7 +248,7 @@ Para generar el APK de release:
 El APK se genera en `app/build/outputs/apk/release/`. Cópialo a la carpeta `releases/` y renómbralo:
 
 ```bash
-cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.0.apk
+cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.1.apk
 ```
 
 Para el APK de debug (con firma automática):

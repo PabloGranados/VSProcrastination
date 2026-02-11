@@ -176,8 +176,8 @@ class FirestoreSyncManager(
                 val docRef = tasksCollection(uid).add(data).await()
                 taskDao.updateFirebaseId(task.id, docRef.id)
             }
-        } catch (_: Exception) {
-            // Sync silencioso — no bloquear la UX por error de red
+        } catch (e: Exception) {
+            android.util.Log.w("FirestoreSync", "Error syncing single task", e)
         }
     }
     
@@ -197,7 +197,9 @@ class FirestoreSyncManager(
         firebaseId?.let {
             try {
                 tasksCollection(uid).document(it).delete().await()
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                android.util.Log.w("FirestoreSync", "Error deleting remote task", e)
+            }
         }
     }
     
