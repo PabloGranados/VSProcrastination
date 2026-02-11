@@ -21,6 +21,7 @@ import com.example.vsprocrastination.ui.screens.SettingsScreen
 import com.example.vsprocrastination.ui.screens.WeeklySummaryScreen
 import com.example.vsprocrastination.ui.theme.VSProcrastinationTheme
 import com.example.vsprocrastination.ui.viewmodel.MainViewModel
+import androidx.activity.compose.rememberLauncherForActivityResult
 
 class MainActivity : ComponentActivity() {
     
@@ -54,10 +55,27 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable("settings") {
+                        // Launcher para Google Sign-In
+                        val signInLauncher = rememberLauncherForActivityResult(
+                            contract = ActivityResultContracts.StartActivityForResult()
+                        ) { result ->
+                            viewModel.handleSignInResult(result.data)
+                        }
+                        
                         SettingsScreen(
                             preferencesManager = viewModel.preferencesManager,
                             onBack = { navController.popBackStack() },
-                            onClearCompleted = { viewModel.clearCompletedTasks() }
+                            onClearCompleted = { viewModel.clearCompletedTasks() },
+                            isSignedIn = uiState.isSignedIn,
+                            userEmail = uiState.userEmail,
+                            userName = uiState.userName,
+                            isSyncing = uiState.isSyncing,
+                            lastSyncMessage = uiState.lastSyncMessage,
+                            onSignInClick = {
+                                signInLauncher.launch(viewModel.getGoogleSignInClient().signInIntent)
+                            },
+                            onSignOutClick = { viewModel.signOut() },
+                            onSyncClick = { viewModel.syncTasks() }
                         )
                     }
                     composable("weekly_summary") {

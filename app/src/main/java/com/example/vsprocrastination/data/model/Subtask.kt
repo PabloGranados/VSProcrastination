@@ -36,5 +36,7 @@ data class Subtask(
     val taskId: Long,
     val name: String,
     val isCompleted: Boolean = false,
-    val sortOrder: Int = 0
+    val sortOrder: Int = 0,
+    // Firebase sync field (v4)
+    val firebaseId: String? = null
 )

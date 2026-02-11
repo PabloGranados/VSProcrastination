@@ -64,7 +64,11 @@ data class Task(
     val completedAt: Long? = null,
     
     // Tiempo trabajado en la tarea (para Pomodoro)
-    val totalTimeWorkedMillis: Long = 0
+    val totalTimeWorkedMillis: Long = 0,
+    
+    // Firebase sync fields (v4)
+    val firebaseId: String? = null,
+    val lastModifiedAt: Long = System.currentTimeMillis()
 ) {
     /**
      * Calcula el score de prioridad de la tarea.

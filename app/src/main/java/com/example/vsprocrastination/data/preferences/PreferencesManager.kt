@@ -26,6 +26,10 @@ class PreferencesManager(private val context: Context) {
         // Tema
         val DARK_MODE_KEY = stringPreferencesKey("dark_mode") // "system", "light", "dark"
         
+        // Sync
+        val SYNC_ENABLED_KEY = booleanPreferencesKey("sync_enabled")
+        val LAST_SYNC_TIMESTAMP_KEY = longPreferencesKey("last_sync_timestamp")
+        
         // Defaults
         const val DEFAULT_POMODORO_MINUTES = 25
         const val DEFAULT_DARK_MODE = "system"
@@ -72,6 +76,27 @@ class PreferencesManager(private val context: Context) {
     suspend fun setDarkMode(mode: String) {
         context.dataStore.edit { prefs ->
             prefs[DARK_MODE_KEY] = mode
+        }
+    }
+    
+    // --- Sync ---
+    val syncEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[SYNC_ENABLED_KEY] ?: false
+    }
+    
+    suspend fun setSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[SYNC_ENABLED_KEY] = enabled
+        }
+    }
+    
+    val lastSyncTimestamp: Flow<Long> = context.dataStore.data.map { prefs ->
+        prefs[LAST_SYNC_TIMESTAMP_KEY] ?: 0L
+    }
+    
+    suspend fun setLastSyncTimestamp(timestamp: Long = System.currentTimeMillis()) {
+        context.dataStore.edit { prefs ->
+            prefs[LAST_SYNC_TIMESTAMP_KEY] = timestamp
         }
     }
 }

@@ -3,13 +3,12 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 android {
     namespace = "com.example.vsprocrastination"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.vsprocrastination"
@@ -68,6 +67,14 @@ dependencies {
     
     // DataStore Preferences
     implementation(libs.androidx.datastore.preferences)
+    
+    // Firebase (Sync entre dispositivos)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.analytics)
+    implementation(libs.play.services.auth)
+    implementation(libs.kotlinx.coroutines.play.services)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

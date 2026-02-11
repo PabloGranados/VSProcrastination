@@ -22,7 +22,7 @@ import com.example.vsprocrastination.data.model.TaskConverters
  */
 @Database(
     entities = [Task::class, Subtask::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(TaskConverters::class)
@@ -69,6 +69,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
         
+        /**
+         * Migración v3→v4: Agrega campos de sincronización Firebase.
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN firebaseId TEXT")
+                db.execSQL("ALTER TABLE tasks ADD COLUMN lastModifiedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE subtasks ADD COLUMN firebaseId TEXT")
+            }
+        }
+        
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -76,7 +87,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "vsprocrastination_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

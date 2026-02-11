@@ -6,6 +6,7 @@ import com.example.vsprocrastination.data.model.Difficulty
 import com.example.vsprocrastination.data.model.Priority
 import com.example.vsprocrastination.data.model.Subtask
 import com.example.vsprocrastination.data.model.Task
+import com.example.vsprocrastination.data.sync.FirestoreSyncManager
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -14,7 +15,8 @@ import kotlinx.coroutines.flow.Flow
  */
 class TaskRepository(
     private val taskDao: TaskDao,
-    private val subtaskDao: SubtaskDao
+    private val subtaskDao: SubtaskDao,
+    val syncManager: FirestoreSyncManager? = null
 ) {
     
     /**
@@ -61,6 +63,9 @@ class TaskRepository(
             subtaskDao.insertSubtasks(subtasks)
         }
         
+        // Sync incremental a Firebase
+        syncManager?.pushTaskById(taskId)
+        
         return taskId
     }
     
@@ -76,6 +81,8 @@ class TaskRepository(
      */
     suspend fun completeTask(taskId: Long) {
         taskDao.markAsCompleted(taskId)
+        taskDao.updateLastModified(taskId)
+        syncManager?.pushTaskById(taskId)
     }
     
     /**
@@ -96,13 +103,16 @@ class TaskRepository(
      * Actualiza una tarea existente.
      */
     suspend fun updateTask(task: Task) {
-        taskDao.updateTask(task)
+        val updated = task.copy(lastModifiedAt = System.currentTimeMillis())
+        taskDao.updateTask(updated)
+        syncManager?.pushSingleTask(updated)
     }
     
     /**
      * Elimina una tarea.
      */
     suspend fun deleteTask(task: Task) {
+        syncManager?.deleteRemoteTask(task.firebaseId)
         taskDao.deleteTask(task)
     }
     

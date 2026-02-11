@@ -94,4 +94,30 @@ interface TaskDao {
      */
     @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND deadlineMillis IS NOT NULL AND deadlineMillis > :now AND deadlineMillis <= :cutoff")
     suspend fun getTasksWithDeadlineBetween(now: Long, cutoff: Long): List<Task>
+    
+    // === Queries para sincronización Firebase ===
+    
+    /**
+     * Obtiene todas las tareas de forma síncrona (para sync).
+     */
+    @Query("SELECT * FROM tasks")
+    suspend fun getAllTasksSync(): List<Task>
+    
+    /**
+     * Busca una tarea por su Firebase ID.
+     */
+    @Query("SELECT * FROM tasks WHERE firebaseId = :firebaseId LIMIT 1")
+    suspend fun getTaskByFirebaseId(firebaseId: String): Task?
+    
+    /**
+     * Actualiza el Firebase ID de una tarea local.
+     */
+    @Query("UPDATE tasks SET firebaseId = :firebaseId WHERE id = :taskId")
+    suspend fun updateFirebaseId(taskId: Long, firebaseId: String)
+    
+    /**
+     * Actualiza el timestamp de última modificación.
+     */
+    @Query("UPDATE tasks SET lastModifiedAt = :timestamp WHERE id = :taskId")
+    suspend fun updateLastModified(taskId: Long, timestamp: Long = System.currentTimeMillis())
 }

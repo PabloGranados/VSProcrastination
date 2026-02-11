@@ -3,8 +3,10 @@ package com.example.vsprocrastination.ui.viewmodel
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.vsprocrastination.R
 import com.example.vsprocrastination.data.database.AppDatabase
 import com.example.vsprocrastination.data.model.Difficulty
 import com.example.vsprocrastination.data.model.Priority
@@ -12,6 +14,7 @@ import com.example.vsprocrastination.data.model.Subtask
 import com.example.vsprocrastination.data.model.Task
 import com.example.vsprocrastination.data.preferences.PreferencesManager
 import com.example.vsprocrastination.data.repository.TaskRepository
+import com.example.vsprocrastination.data.sync.FirestoreSyncManager
 import com.example.vsprocrastination.domain.MotivationalPhrases
 import com.example.vsprocrastination.domain.PriorityCalculator
 import com.example.vsprocrastination.domain.StreakCalculator
@@ -21,8 +24,15 @@ import com.example.vsprocrastination.service.DeadlineCountdownWorker
 import com.example.vsprocrastination.service.FocusService
 import com.example.vsprocrastination.service.TaskReminderWorker
 import com.example.vsprocrastination.service.TimerState
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 /**
  * Estado de la UI principal.
@@ -48,7 +58,13 @@ data class MainUiState(
     val showCelebration: Boolean = false,
     val motivationalPhrase: String = "",
     val suggestedTaskSubtasks: List<Subtask> = emptyList(),
-    val pomodoroDuration: Int = 25
+    val pomodoroDuration: Int = 25,
+    // Sincronización entre dispositivos
+    val isSignedIn: Boolean = false,
+    val userEmail: String? = null,
+    val userName: String? = null,
+    val isSyncing: Boolean = false,
+    val lastSyncMessage: String? = null
 )
 
 /**
@@ -58,7 +74,8 @@ data class MainUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     private val database = AppDatabase.getDatabase(application)
-    private val repository = TaskRepository(database.taskDao(), database.subtaskDao())
+    private val syncManager = FirestoreSyncManager(database.taskDao(), database.subtaskDao())
+    private val repository = TaskRepository(database.taskDao(), database.subtaskDao(), syncManager)
     val preferencesManager = PreferencesManager(application)
     private val context: Context get() = getApplication()
     
@@ -73,6 +90,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         observeFocusService()
         observePreferences()
         initializeNotifications()
+        updateAuthState()
+        autoSyncOnStart()
     }
     
     /**
@@ -470,5 +489,142 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     suspend fun getSubtasksForTask(taskId: Long): List<Subtask> {
         return repository.getSubtasksForTaskSync(taskId)
+    }
+    
+    // === Sincronización entre dispositivos ===
+    
+    /**
+     * Crea el cliente de Google Sign-In.
+     * El web client ID se autogenera del google-services.json.
+     */
+    fun getGoogleSignInClient(): GoogleSignInClient {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(context.getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+        return GoogleSignIn.getClient(context, gso)
+    }
+    
+    /**
+     * Procesa el resultado del intent de Google Sign-In.
+     * Autentica con Firebase y lanza la primera sincronización.
+     */
+    fun handleSignInResult(data: Intent?) {
+        if (data == null) {
+            _uiState.update {
+                it.copy(lastSyncMessage = "❌ Inicio de sesión cancelado")
+            }
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isSyncing = true) }
+                
+                val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+                val account = task.getResult(ApiException::class.java)
+                
+                val idToken = account.idToken
+                if (idToken == null) {
+                    _uiState.update {
+                        it.copy(
+                            isSyncing = false,
+                            lastSyncMessage = "❌ No se obtuvo token. ¿Habilitaste Google en Firebase Console → Authentication?"
+                        )
+                    }
+                    return@launch
+                }
+                
+                val credential = GoogleAuthProvider.getCredential(idToken, null)
+                FirebaseAuth.getInstance().signInWithCredential(credential).await()
+                
+                updateAuthState()
+                
+                // Primera sincronización completa
+                val result = syncManager.syncAll()
+                preferencesManager.setSyncEnabled(true)
+                preferencesManager.setLastSyncTimestamp()
+                
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        lastSyncMessage = result.message
+                    )
+                }
+            } catch (e: ApiException) {
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        lastSyncMessage = "❌ Google Sign-In falló (code: ${e.statusCode}). Verifica google-services.json"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        lastSyncMessage = "❌ Error: ${e.localizedMessage}"
+                    )
+                }
+            }
+        }
+    }
+    
+    /**
+     * Cierra sesión de Google y Firebase.
+     */
+    fun signOut() {
+        FirebaseAuth.getInstance().signOut()
+        getGoogleSignInClient().signOut()
+        viewModelScope.launch {
+            preferencesManager.setSyncEnabled(false)
+        }
+        updateAuthState()
+        _uiState.update { it.copy(lastSyncMessage = null) }
+    }
+    
+    /**
+     * Sincronización manual (botón).
+     */
+    fun syncTasks() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSyncing = true) }
+            val result = syncManager.syncAll()
+            if (result.success) {
+                preferencesManager.setLastSyncTimestamp()
+            }
+            _uiState.update {
+                it.copy(
+                    isSyncing = false,
+                    lastSyncMessage = result.message
+                )
+            }
+        }
+    }
+    
+    /**
+     * Actualiza el estado de autenticación en la UI.
+     */
+    private fun updateAuthState() {
+        _uiState.update {
+            it.copy(
+                isSignedIn = syncManager.isSignedIn(),
+                userEmail = syncManager.getCurrentUserEmail(),
+                userName = syncManager.getCurrentUserName()
+            )
+        }
+    }
+    
+    /**
+     * Auto-sync al abrir la app si está autenticado.
+     */
+    private fun autoSyncOnStart() {
+        if (syncManager.isSignedIn()) {
+            viewModelScope.launch {
+                try {
+                    syncManager.syncAll()
+                    preferencesManager.setLastSyncTimestamp()
+                } catch (_: Exception) { }
+            }
+        }
     }
 }
