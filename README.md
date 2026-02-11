@@ -1,8 +1,24 @@
 # VS Procrastination
 
-App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
+
+## Descargar APK
+
+📲 **[Descargar VS Procrastination v2.0](releases/VS-Procrastination-v2.0.apk)**
+
+> Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
+
+## Novedades en v2.0
+
+### 🔄 Sincronización entre dispositivos
+- **Tus tareas en todos tus dispositivos**: celular, tablet, cualquier Android
+- Inicia sesión con Google y tus tareas se sincronizan automáticamente
+- Sincronización al abrir la app y al hacer cambios (crear, editar, completar, eliminar)
+- Botón "Sincronizar ahora" en Ajustes para forzar sincronización manual
+- Resolución de conflictos automática (gana la versión más reciente)
+- Funciona offline: si no hay internet, los datos se guardan localmente y se sincronizan después
 
 ## Cómo funciona
 
@@ -79,6 +95,7 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 - Duración del Pomodoro ajustable
 - Toggle de notificaciones nagging y recordatorios de deadline
 - Tema: claro, oscuro o automático del sistema
+- Sincronización con Google (nuevo en v2.0)
 - Limpiar tareas completadas
 
 ### Progreso
@@ -91,7 +108,9 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 ## Tech stack
 
 - Kotlin 2.0 + Jetpack Compose con Material Design 3
-- Room 2.6 con migraciones (v1 -> v2 -> v3)
+- Room 2.6 con migraciones (v1 → v2 → v3 → v4)
+- Firebase Auth + Firestore para sincronización entre dispositivos
+- Google Sign-In para autenticación
 - WorkManager 2.9 para notificaciones programadas y workers periódicos
 - Foreground Service con cronómetro nativo para el timer
 - Navigation Compose 2.8 para navegación entre pantallas
@@ -113,11 +132,13 @@ app/src/main/java/com/example/vsprocrastination/
 │   │   ├── TaskDao.kt           # Queries Room (Flow reactivo + suspend)
 │   │   └── SubtaskDao.kt        # CRUD subtareas
 │   ├── database/
-│   │   └── AppDatabase.kt       # Singleton Room, migraciones v1-v3
+│   │   └── AppDatabase.kt       # Singleton Room, migraciones v1-v4
 │   ├── preferences/
 │   │   └── PreferencesManager.kt # DataStore para settings
-│   └── repository/
-│       └── TaskRepository.kt    # Capa de abstracción sobre DAOs
+│   ├── repository/
+│   │   └── TaskRepository.kt    # Capa de abstracción sobre DAOs
+│   └── sync/
+│       └── FirestoreSyncManager.kt # Sincronización Room ↔ Firestore
 ├── domain/
 │   ├── PriorityCalculator.kt    # Algoritmo de priorización + stats
 │   ├── StreakCalculator.kt      # Cálculo de rachas consecutivas
@@ -155,7 +176,48 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 - `VIBRATE` — notificaciones nagging y countdown
 - `RECEIVE_BOOT_COMPLETED` — reprogramar workers tras reinicio
 - `WAKE_LOCK` — WorkManager interno
+- `INTERNET` — sincronización con Firebase
+
+## Changelog
+
+### v2.0 (febrero 2026)
+- Sincronización entre dispositivos con Firebase (Auth + Firestore)
+- Google Sign-In para vincular cuenta
+- Sync automático al abrir la app y al modificar tareas
+- Sync manual desde Ajustes
+- Migración de base de datos v3 → v4
+- Mejoras menores de estabilidad
+
+### v1.0
+- Lanzamiento inicial
+- Algoritmo de priorización automático
+- Modo Enfoque (Pomodoro) con Foreground Service
+- Subtareas, rachas, frases motivacionales
+- Notificaciones persistentes, nagging y countdown estilo Duolingo
+- Resumen semanal
+
+## Generar APK
+
+Para generar el APK de release:
+
+```bash
+./gradlew assembleRelease
+```
+
+El APK se genera en `app/build/outputs/apk/release/`. Cópialo a la carpeta `releases/` y renómbralo:
+
+```bash
+cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.0.apk
+```
+
+Para el APK de debug (con firma automática):
+
+```bash
+./gradlew assembleDebug
+```
+
+El APK de debug queda en `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Licencia
 
-Uso personal.
+Pablo Daniel Granados Martínez.

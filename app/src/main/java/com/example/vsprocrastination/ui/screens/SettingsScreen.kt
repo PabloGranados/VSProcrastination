@@ -341,6 +341,15 @@ fun SettingsScreen(
                 }
             }
             
+            // === VERSIÓN ===
+            Text(
+                text = "VS Procrastination v2.0",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
