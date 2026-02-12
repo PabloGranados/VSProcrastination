@@ -191,7 +191,7 @@ private fun HabitsList(uiState: HabitUiState, viewModel: HabitViewModel) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Header con progreso del día
         item {
@@ -312,6 +312,7 @@ private fun HabitCard(
         modifier = Modifier
             .fillMaxWidth()
             .scale(scale),
+        onClick = onToggle,
         colors = CardDefaults.cardColors(
             containerColor = if (isCompleted)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
@@ -323,8 +324,7 @@ private fun HabitCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(horizontal = 16.dp, vertical = 16.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -365,23 +365,22 @@ private fun HabitCard(
                 }
             }
             
-            // Botón editar (sutil)
+            // Botón editar
             IconButton(
                 onClick = onEdit,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(40.dp)
             ) {
                 Icon(
                     Icons.Default.Edit,
                     contentDescription = "Editar",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             }
             
-            // Checkbox grande
+            // Checkbox visual (el Card maneja el toggle)
             HabitCheckbox(
-                isChecked = isCompleted,
-                onToggle = onToggle
+                isChecked = isCompleted
             )
         }
     }
@@ -391,7 +390,7 @@ private fun HabitCard(
  * Checkbox personalizado — más grande y satisfactorio que el default.
  */
 @Composable
-private fun HabitCheckbox(isChecked: Boolean, onToggle: () -> Unit) {
+private fun HabitCheckbox(isChecked: Boolean) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isChecked) 
             MaterialTheme.colorScheme.primary 
@@ -408,11 +407,9 @@ private fun HabitCheckbox(isChecked: Boolean, onToggle: () -> Unit) {
     
     Box(
         modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(backgroundColor)
-            .border(2.dp, borderColor, CircleShape)
-            .clickable(onClick = onToggle),
+            .size(44.dp)
+            .background(backgroundColor, CircleShape)
+            .border(2.dp, borderColor, CircleShape),
         contentAlignment = Alignment.Center
     ) {
         AnimatedVisibility(
@@ -424,7 +421,7 @@ private fun HabitCheckbox(isChecked: Boolean, onToggle: () -> Unit) {
                 text = "✓",
                 color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                fontSize = 20.sp
             )
         }
     }
