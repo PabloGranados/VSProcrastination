@@ -16,6 +16,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.vsprocrastination.data.preferences.PreferencesManager
+import com.example.vsprocrastination.ui.screens.HabitTrackerScreen
 import com.example.vsprocrastination.ui.screens.MainScreen
 import com.example.vsprocrastination.ui.screens.SettingsScreen
 import com.example.vsprocrastination.ui.screens.WeeklySummaryScreen
@@ -51,7 +52,8 @@ class MainActivity : ComponentActivity() {
                         MainScreen(
                             viewModel = viewModel,
                             onNavigateToSettings = { navController.navigate("settings") },
-                            onNavigateToWeeklySummary = { navController.navigate("weekly_summary") }
+                            onNavigateToWeeklySummary = { navController.navigate("weekly_summary") },
+                            onNavigateToHabits = { navController.navigate("habits") }
                         )
                     }
                     composable("settings") {
@@ -82,6 +84,11 @@ class MainActivity : ComponentActivity() {
                         WeeklySummaryScreen(
                             tasks = uiState.allTasks,
                             stats = uiState.stats,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
+                    composable("habits") {
+                        HabitTrackerScreen(
                             onBack = { navController.popBackStack() }
                         )
                     }

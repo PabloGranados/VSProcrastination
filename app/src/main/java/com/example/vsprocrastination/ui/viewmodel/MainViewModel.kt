@@ -13,6 +13,7 @@ import com.example.vsprocrastination.data.model.Priority
 import com.example.vsprocrastination.data.model.Subtask
 import com.example.vsprocrastination.data.model.Task
 import com.example.vsprocrastination.data.preferences.PreferencesManager
+import com.example.vsprocrastination.data.repository.HabitRepository
 import com.example.vsprocrastination.data.repository.TaskRepository
 import com.example.vsprocrastination.data.sync.FirestoreSyncManager
 import com.example.vsprocrastination.domain.MotivationalPhrases
@@ -65,7 +66,9 @@ data class MainUiState(
     val userEmail: String? = null,
     val userName: String? = null,
     val isSyncing: Boolean = false,
-    val lastSyncMessage: String? = null
+    val lastSyncMessage: String? = null,
+    // Hábitos (para mapa de calor)
+    val habitCompletionsByDay: Map<String, List<String>> = emptyMap()
 )
 
 /**
@@ -77,6 +80,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
     private val syncManager = FirestoreSyncManager(database.taskDao(), database.subtaskDao())
     private val repository = TaskRepository(database.taskDao(), database.subtaskDao(), syncManager)
+    private val habitRepository = HabitRepository(database.habitDao())
     val preferencesManager = PreferencesManager(application)
     private val context: Context get() = getApplication()
     
@@ -88,6 +92,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     init {
         observeTasks()
+        observeHabitData()
         observeFocusService()
         observePreferences()
         initializeNotifications()
@@ -151,6 +156,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         suggestedTaskSubtasks = subtasks
                     )
                 }
+            }
+        }
+    }
+    
+    /**
+     * Observa datos de hábitos para integrarlos en el mapa de calor.
+     * Los hábitos completados aparecen en el ContributionCalendar.
+     */
+    private fun observeHabitData() {
+        viewModelScope.launch {
+            combine(
+                habitRepository.activeHabits,
+                habitRepository.allLogs
+            ) { habits, logs ->
+                val habitMap = habits.associateBy { it.id }
+                val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                
+                // Convertir logs a Map<"yyyy-MM-dd", List<habitName>>
+                logs.groupBy { it.dateEpochDay }
+                    .mapKeys { (epochDay, _) ->
+                        val cal = java.util.Calendar.getInstance()
+                        cal.timeInMillis = epochDay.toLong() * 24 * 60 * 60 * 1000L
+                        dateFormat.format(cal.time)
+                    }
+                    .mapValues { (_, dayLogs) ->
+                        dayLogs.mapNotNull { log ->
+                            habitMap[log.habitId]?.let { "${it.emoji} ${it.name}" }
+                        }
+                    }
+            }.collect { habitsByDay ->
+                _uiState.update { it.copy(habitCompletionsByDay = habitsByDay) }
             }
         }
     }

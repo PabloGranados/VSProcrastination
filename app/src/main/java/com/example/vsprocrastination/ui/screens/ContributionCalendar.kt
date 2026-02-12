@@ -45,7 +45,8 @@ import java.util.*
 data class DayActivity(
     val date: Calendar,
     val completedCount: Int,
-    val completedTasks: List<String> = emptyList() // Nombres de tareas completadas
+    val completedTasks: List<String> = emptyList(),
+    val completedHabits: List<String> = emptyList()
 )
 
 /**
@@ -57,6 +58,7 @@ data class DayActivity(
 fun ContributionCalendar(
     tasks: List<Task>,
     modifier: Modifier = Modifier,
+    habitCompletionsByDay: Map<String, List<String>> = emptyMap(),
     onDayClick: (DayActivity) -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
@@ -66,7 +68,7 @@ fun ContributionCalendar(
     val labelColumnWidth = if (isExpanded) 24.dp else 20.dp
     val cellStep = cellSize + cellSpacing
 
-    val activityData = remember(tasks) { buildActivityData(tasks) }
+    val activityData = remember(tasks, habitCompletionsByDay) { buildActivityData(tasks, habitCompletionsByDay) }
     val weeks = remember(activityData) { groupIntoWeeks(activityData) }
     var selectedDay by remember { mutableStateOf<DayActivity?>(null) }
     
@@ -241,26 +243,48 @@ private fun DayDetailCard(day: DayActivity) {
             Spacer(modifier = Modifier.height(4.dp))
             
             if (day.completedCount > 0) {
-                Text(
-                    text = "✅ ${day.completedCount} tarea${if (day.completedCount > 1) "s" else ""} completada${if (day.completedCount > 1) "s" else ""}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                if (day.completedTasks.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    day.completedTasks.take(5).forEach { taskName ->
+                val taskCount = day.completedTasks.size
+                val habitCount = day.completedHabits.size
+                
+                if (taskCount > 0) {
+                    Text(
+                        text = "✅ $taskCount tarea${if (taskCount > 1) "s" else ""} completada${if (taskCount > 1) "s" else ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    if (day.completedTasks.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        day.completedTasks.take(5).forEach { taskName ->
+                            Text(
+                                text = "  • $taskName",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                        if (day.completedTasks.size > 5) {
+                            Text(
+                                text = "  ...y ${day.completedTasks.size - 5} más",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+                
+                if (habitCount > 0) {
+                    if (taskCount > 0) Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "🔄 $habitCount hábito${if (habitCount > 1) "s" else ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    day.completedHabits.take(5).forEach { habitName ->
                         Text(
-                            text = "  • $taskName",
+                            text = "  • $habitName",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1
-                        )
-                    }
-                    if (day.completedTasks.size > 5) {
-                        Text(
-                            text = "  ...y ${day.completedTasks.size - 5} más",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -309,7 +333,7 @@ private fun getActivityLevel(count: Int): ActivityLevels {
 /**
  * Construye datos de actividad para los últimos 105 días (15 semanas).
  */
-private fun buildActivityData(tasks: List<Task>): List<DayActivity> {
+private fun buildActivityData(tasks: List<Task>, habitCompletionsByDay: Map<String, List<String>> = emptyMap()): List<DayActivity> {
     val completedTasks = tasks.filter { it.completedAt != null }
     
     // Agrupar tareas por día
@@ -343,12 +367,14 @@ private fun buildActivityData(tasks: List<Task>): List<DayActivity> {
     while (calendar.before(endDate)) {
         val dayKey = dayFormat.format(calendar.time)
         val tasksForDay = tasksByDay[dayKey] ?: emptyList()
+        val habitsForDay = habitCompletionsByDay[dayKey] ?: emptyList()
         
         days.add(
             DayActivity(
                 date = calendar.clone() as Calendar,
-                completedCount = tasksForDay.size,
-                completedTasks = tasksForDay.map { it.name }
+                completedCount = tasksForDay.size + habitsForDay.size,
+                completedTasks = tasksForDay.map { it.name },
+                completedHabits = habitsForDay
             )
         )
         

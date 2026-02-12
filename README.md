@@ -1,18 +1,40 @@
 # VS Procrastination
 
-**v2.1.3** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.2.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
 
 ## Descargar APK
 
-📲 **[Descargar VS Procrastination v2.1.3](releases/VS-Procrastination-v2.1.3.apk)**
+📲 **[Descargar VS Procrastination v2.2.0](releases/VS-Procrastination-v2.2.0.apk)**
 
 > Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
 
-## Novedades en v2.1.3
+## Novedades en v2.2.0
 
-### 🐛 Corrección de bugs críticos
+### 🔄 Habit Tracker — Seguimiento de hábitos diarios
+- **Nueva pantalla de hábitos**: accesible desde el botón 🔄 en la pantalla principal
+- **Crea hábitos** con nombre y emoji personalizado (16 emojis sugeridos: 📖🏃🧘💪🎵✍️💧🥗😴🚿🧹📱💊🌅📝✅)
+- **Un tap para completar**: checkbox circular animado, sin fricción
+- **Racha por hábito**: cada hábito muestra su racha individual (🔥 5 días)
+- **Progreso del día**: barra animada con conteo "3/5" y celebración "🎉 ¡Todos!" al completar todos
+- **Editar y archivar**: soft delete que preserva todo el historial
+- **Integrado con el mapa de calor**: los hábitos completados aparecen en el ContributionCalendar junto con las tareas, sumando actividad diaria
+- **Detalle expandido**: al tocar un día en el calendario, ahora muestra tareas Y hábitos completados
+- **Tips motivacionales** contextuales al pie de la lista (Aristóteles, James Clear)
+- **Diseño responsive**: padding adaptativo para tablets (compact/medium/expanded)
+- Justificación: Atomic Habits (James Clear) + Tiny Habits (B.J. Fogg) + Don't Break the Chain (Seinfeld)
+
+### 🏗️ Arquitectura
+- **Entidades separadas**: `Habit` y `HabitLog` como tablas Room independientes de `Task` — los hábitos no compiten con las tareas en el algoritmo de priorización
+- **Migración Room v4→v5**: tablas `habits` y `habit_logs` con índices optimizados y foreign key CASCADE
+- **HabitViewModel** independiente del MainViewModel — cada pantalla gestiona su propio estado
+- **HabitRepository** con toggle atómico de completación diaria y cálculo de rachas
+- Campos `firebaseId` preparados para sincronización futura
+
+## Novedades anteriores
+
+### � Corrección de bugs críticos (v2.1.3)
 - **Rachas ya no se rompen en Año Nuevo**: corregido el cálculo de `dayKey()` que usaba `year*1000+dayOfYear` — ahora usa epoch days para garantizar consecutividad entre años
 - **Las preferencias de notificación ahora funcionan**: los toggles de "nagging" y "recordatorios de deadline" en Ajustes realmente desactivan las notificaciones (antes eran cosméticos)
 - **Notificaciones consistentes**: corregido bug donde la notificación compacta y expandida mostraban mensajes diferentes
@@ -20,20 +42,18 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 - **Limpieza de tareas completadas sincroniza con Firebase**: al borrar tareas completadas, ahora también se eliminan de Firestore
 - **Versión dinámica**: la pantalla de Ajustes muestra la versión real desde `BuildConfig` en lugar de un texto fijo
 
-### 🛡️ Seguridad y estabilidad
+### 🛡️ Seguridad y estabilidad (v2.1.3)
 - **TaskConverters a prueba de crashes**: valores corruptos en la BD ya no causan crash — devuelven defaults seguros
 - **Logs condicionales**: `Log.w()` solo se ejecuta en builds de debug, no en release
 - **ProGuard configurado**: reglas para Room, Firebase, Coroutines, DataStore y enums
 - **Sincronización thread-safe**: añadido Mutex para evitar sync concurrentes en Firestore
 - **Room Schema Export habilitado**: permite verificar integridad de migraciones futuras
 
-### 🔧 Mejoras de código
+### 🔧 Mejoras de código (v2.1.3)
 - **Código duplicado eliminado**: Workers ahora reutilizan `StreakCalculator` en lugar de duplicar la lógica
 - **Botón "CONTINUAR" corregido**: ya no muestra "25 min" fijo ignorando la configuración del usuario
 
-## Novedades anteriores
-
-### 📱 Diseño responsive para tablets y landscape (v2.1.2)
+### �📱 Diseño responsive para tablets y landscape (v2.1.2)
 - **Layout de dos paneles** en tablets y modo horizontal: tarea hero a la izquierda, cola de tareas a la derecha
 - **Modo Enfoque adaptativo**: en landscape muestra información de la tarea y timer lado a lado, aprovechando el espacio horizontal
 - **Padding dinámico** en todas las pantallas: Ajustes y Resumen Semanal se adaptan al ancho disponible (compact < 600dp, medium 600-840dp, expanded > 840dp)
@@ -109,6 +129,8 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 | Don't Break the Chain (Seinfeld) | Mapa de calor de actividad con historial de 15 semanas |
 | Ritmos Circadianos | Notificaciones adaptadas a la hora del día (cortisol matutino, bajón post-prandial, pico vespertino) |
 | Planning Fallacy (Kahneman) | Reflexión nocturna para planificar el día siguiente |
+| Atomic Habits (James Clear) | Habit Tracker con checkboxes diarios y rachas por hábito |
+| Tiny Habits (B.J. Fogg) | Celebración visual inmediata al completar un hábito |
 
 ## Features
 
@@ -159,6 +181,16 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 - Sincronización con Google (nuevo en v2.0)
 - Limpiar tareas completadas
 
+### Habit Tracker
+
+- Crear hábitos diarios con nombre y emoji personalizado
+- Checkbox circular animado para completar/desmarcar hábitos
+- Racha individual por hábito (días consecutivos)
+- Progreso del día con barra animada y celebración al completar todos
+- Archivar hábitos preservando historial
+- Tips motivacionales contextuales según el progreso del día
+- Integración con el mapa de calor (los hábitos suman actividad diaria)
+
 ### Progreso y calendario
 
 - **Mapa de calor de actividad** con 15 semanas de historial
@@ -172,7 +204,7 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 ## Tech stack
 
 - Kotlin 2.0 + Jetpack Compose con Material Design 3
-- Room 2.6 con migraciones (v1 → v2 → v3 → v4)
+- Room 2.6 con migraciones (v1 → v2 → v3 → v4 → v5)
 - Firebase Auth + Firestore para sincronización entre dispositivos
 - Google Sign-In para autenticación
 - WorkManager 2.9 para notificaciones programadas y workers periódicos
@@ -190,17 +222,21 @@ app/src/main/java/com/example/vsprocrastination/
 │   ├── model/
 │   │   ├── Task.kt              # Entidad principal con cálculo de score
 │   │   ├── Subtask.kt           # Subtareas con FK a Task
+│   │   ├── Habit.kt             # Hábitos diarios recurrentes
+│   │   ├── HabitLog.kt          # Registro de completación diaria
 │   │   ├── Difficulty.kt        # Enum: EASY, MEDIUM, HARD
 │   │   └── Priority.kt          # Enum: LOW, NORMAL, HIGH, URGENT
 │   ├── dao/
 │   │   ├── TaskDao.kt           # Queries Room (Flow reactivo + suspend)
-│   │   └── SubtaskDao.kt        # CRUD subtareas
+│   │   ├── SubtaskDao.kt        # CRUD subtareas
+│   │   └── HabitDao.kt          # CRUD hábitos + logs de completación
 │   ├── database/
-│   │   └── AppDatabase.kt       # Singleton Room, migraciones v1-v4
+│   │   └── AppDatabase.kt       # Singleton Room, migraciones v1-v5
 │   ├── preferences/
 │   │   └── PreferencesManager.kt # DataStore para settings
 │   ├── repository/
-│   │   └── TaskRepository.kt    # Capa de abstracción sobre DAOs
+│   │   ├── TaskRepository.kt    # Capa de abstracción sobre DAOs
+│   │   └── HabitRepository.kt   # Lógica de hábitos: toggle, rachas, CRUD
 │   └── sync/
 │       └── FirestoreSyncManager.kt # Sincronización Room ↔ Firestore
 ├── domain/
@@ -217,14 +253,16 @@ app/src/main/java/com/example/vsprocrastination/
 ├── ui/
 │   ├── screens/
 │   │   ├── MainScreen.kt        # Pantalla principal (layout adaptativo compact/expanded)
-│   │   ├── ContributionCalendar.kt # Mapa de calor de actividad (responsive)
+│   │   ├── HabitTrackerScreen.kt # Pantalla de hábitos diarios
+│   │   ├── ContributionCalendar.kt # Mapa de calor de actividad (tareas + hábitos)
 │   │   ├── SettingsScreen.kt    # Configuración (padding adaptativo)
 │   │   └── WeeklySummaryScreen.kt # Resumen semanal (padding adaptativo)
 │   ├── viewmodel/
-│   │   └── MainViewModel.kt     # Estado central de la app
+│   │   ├── MainViewModel.kt     # Estado central de la app
+│   │   └── HabitViewModel.kt    # Estado del Habit Tracker
 │   └── theme/
 │       └── Theme.kt             # Tema Material 3 con soporte dark mode
-└── MainActivity.kt              # NavHost con 3 rutas
+└── MainActivity.kt              # NavHost con 4 rutas
 ```
 
 ## Build
@@ -245,6 +283,24 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 - `INTERNET` — sincronización con Firebase
 
 ## Changelog
+
+### v2.2.0 (febrero 2026)
+- Habit Tracker: nueva pantalla de seguimiento de hábitos diarios
+- Crear hábitos con nombre y emoji personalizado
+- Toggle de completación diaria con checkbox animado
+- Racha individual por hábito (días consecutivos)
+- Progreso del día con barra animada y celebración
+- Archivar hábitos (soft delete preservando historial)
+- Integración con el mapa de calor: hábitos suman actividad en ContributionCalendar
+- Detalle de día expandido muestra tareas y hábitos completados
+- Tips motivacionales contextuales según progreso
+- Nueva entidad Room: Habit + HabitLog con migración v4→v5
+- HabitDao con índices optimizados y constraint UNIQUE (habitId, dateEpochDay)
+- HabitRepository con toggle atómico y cálculo de rachas
+- HabitViewModel independiente con StateFlow reactivo
+- Botón de navegación 🔄 en pantalla principal
+- Diseño responsive para tablets
+- NavHost actualizado a 4 rutas
 
 ### v2.1.3 (febrero 2026)
 - Corregido bug crítico: rachas se rompían en cambio de año (dayKey ahora usa epoch days)
@@ -309,7 +365,7 @@ Para generar el APK de release:
 El APK se genera en `app/build/outputs/apk/release/`. Cópialo a la carpeta `releases/` y renómbralo:
 
 ```bash
-cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.1.3.apk
+cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.2.0.apk
 ```
 
 Para el APK de debug (con firma automática):

@@ -52,7 +52,8 @@ import kotlinx.coroutines.launch
 fun MainScreen(
     viewModel: MainViewModel = viewModel(),
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToWeeklySummary: () -> Unit = {}
+    onNavigateToWeeklySummary: () -> Unit = {},
+    onNavigateToHabits: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -92,6 +93,13 @@ fun MainScreen(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Icon(Icons.Default.Settings, "Ajustes", modifier = Modifier.size(20.dp))
+                    }
+                    // Botón hábitos
+                    SmallFloatingActionButton(
+                        onClick = onNavigateToHabits,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Text("🔄", modifier = Modifier.size(20.dp), fontSize = 14.sp)
                     }
                     FloatingActionButton(
                         onClick = { viewModel.toggleAddTaskDialog(true) },
@@ -218,7 +226,8 @@ private fun CompactMainContent(
                         .padding(16.dp)
                 ) {
                     ContributionCalendar(
-                        tasks = uiState.allTasks
+                        tasks = uiState.allTasks,
+                        habitCompletionsByDay = uiState.habitCompletionsByDay
                     )
                     
                     Spacer(modifier = Modifier.height(12.dp))
@@ -386,7 +395,10 @@ private fun ExpandedMainContent(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        ContributionCalendar(tasks = uiState.allTasks)
+                        ContributionCalendar(
+                            tasks = uiState.allTasks,
+                            habitCompletionsByDay = uiState.habitCompletionsByDay
+                        )
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
