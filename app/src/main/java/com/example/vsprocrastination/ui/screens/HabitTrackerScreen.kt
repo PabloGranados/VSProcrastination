@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -324,14 +326,14 @@ private fun HabitCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Emoji del hábito — círculo con fondo sutil (sin clip para no recortar)
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(44.dp)
                     .background(
                         color = if (isCompleted)
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
@@ -368,13 +370,13 @@ private fun HabitCard(
             // Botón editar
             IconButton(
                 onClick = onEdit,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
                     Icons.Default.Edit,
                     contentDescription = "Editar",
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
             
@@ -407,7 +409,7 @@ private fun HabitCheckbox(isChecked: Boolean) {
     
     Box(
         modifier = Modifier
-            .size(44.dp)
+            .size(40.dp)
             .background(backgroundColor, CircleShape)
             .border(2.dp, borderColor, CircleShape),
         contentAlignment = Alignment.Center
@@ -421,7 +423,7 @@ private fun HabitCheckbox(isChecked: Boolean) {
                 text = "✓",
                 color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold,
-                fontSize = 20.sp
+                fontSize = 18.sp
             )
         }
     }
@@ -478,7 +480,10 @@ private fun AddHabitDialog(
         onDismissRequest = onDismiss,
         title = { Text("Nuevo hábito") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 // Campo de nombre
                 OutlinedTextField(
                     value = name,
@@ -568,7 +573,10 @@ private fun EditHabitDialog(
         onDismissRequest = onDismiss,
         title = { Text("Editar hábito") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -618,47 +626,58 @@ private fun EditHabitDialog(
 }
 
 /**
- * Grid de emojis seleccionables.
+ * Grid de emojis seleccionables — adaptativo según ancho de pantalla.
+ * En teléfonos (portrait): 4 columnas con distribución equitativa.
+ * En tablets/landscape: 8 columnas.
  */
 @Composable
 private fun EmojiSelector(
     selectedEmoji: String,
     onEmojiSelected: (String) -> Unit
 ) {
-    // Grid de 8 columnas
-    val rows = SUGGESTED_EMOJIS.chunked(8)
-    
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val columns = if (screenWidth >= 600) 8 else 4
+    val rows = SUGGESTED_EMOJIS.chunked(columns)
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 row.forEach { emoji ->
                     val isSelected = emoji == selectedEmoji
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .weight(1f)
+                            .aspectRatio(1f)
                             .background(
                                 color = if (isSelected)
                                     MaterialTheme.colorScheme.primaryContainer
                                 else
-                                    Color.Transparent,
-                                shape = RoundedCornerShape(8.dp)
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                shape = RoundedCornerShape(12.dp)
                             )
                             .border(
                                 width = if (isSelected) 2.dp else 0.dp,
-                                color = if (isSelected) 
-                                    MaterialTheme.colorScheme.primary 
-                                else 
+                                color = if (isSelected)
+                                    MaterialTheme.colorScheme.primary
+                                else
                                     Color.Transparent,
-                                shape = RoundedCornerShape(8.dp)
+                                shape = RoundedCornerShape(12.dp)
                             )
                             .clickable { onEmojiSelected(emoji) },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = emoji,
-                            fontSize = 24.sp
+                            fontSize = 22.sp
                         )
                     }
+                }
+                // Rellenar espacios vacíos si la última fila está incompleta
+                repeat(columns - row.size) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
