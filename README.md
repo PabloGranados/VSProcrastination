@@ -13,11 +13,13 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 ## Novedades en v2.2.1
 
 ### 🎨 Corrección de UI — Habit Tracker
-- **Emojis ya no se recortan**: cada emoji vive dentro de un círculo de 48dp con fondo sutil (`surfaceVariant` / `primary`) y `wrapContentSize(unbounded = true)` — el glifo nunca se clipea sin importar el dispositivo
-- **Emojis del selector más legibles**: tamaño aumentado a 24sp con renderizado sin recorte
+- **Selector de emojis adaptativo**: grid de 8 columnas fijas reemplazado por layout responsivo — 4 columnas en teléfonos (portrait) y 8 en tablets. Usa `weight(1f)` + `aspectRatio(1f)` para distribución equitativa sin desbordamiento
+- **Emojis ya no se amontonan**: el grid anterior (8×40dp = 348dp) desbordaba el `AlertDialog` en pantallas < 360dp — ahora se adapta a cualquier ancho
+- **Fondo visual en emojis**: todos los emojis del selector tienen fondo `surfaceVariant` sutil, haciéndolos visibles como botones tapeables (antes sólo el seleccionado tenía fondo)
+- **Diálogos scrolleables**: los diálogos de "Nuevo hábito" y "Editar hábito" ahora tienen `verticalScroll` — el contenido ya no se corta en pantallas pequeñas
+- **HabitCard optimizado para portrait**: emoji circle 44dp, checkbox 40dp, botón editar 36dp, spacing reducido — ~24dp extra de espacio horizontal para el nombre del hábito
 - **Animación de completado arreglada**: la escala al marcar un hábito era un no-op (`1f → 1f`), ahora hay feedback visual sutil (`1f → 1.02f`)
-- **Bug de tipo corregido** en `EmptyHabitsState`: comparaba `Dp` con `Modifier`, ahora usa lógica limpia con `screenWidthDp`
-- Padding vertical de cada card aumentado de 12dp a 16dp para mejor espaciado
+- Bordes redondeados de 12dp en los emojis del selector para mejor apariencia
 
 ### 🔔 Notificaciones — Menos spam + horas de silencio
 - **Eliminado worker redundante**: `TaskReminderWorker` periódico (cada 2h) ya no se programa — duplicaba lo que SmartNotificationWorker ya hace mejor
@@ -300,6 +302,18 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 - `INTERNET` — sincronización con Firebase
 
 ## Changelog
+
+### v2.2.1 (febrero 2026)
+- Selector de emojis adaptativo: 4 columnas en portrait, 8 en tablets (weight + aspectRatio)
+- Corregido desbordamiento del grid de emojis en AlertDialog en pantallas < 360dp
+- Fondo visual en todos los emojis del selector (antes solo el seleccionado tenía fondo)
+- Diálogos de hábitos ahora son scrolleables (verticalScroll)
+- HabitCard optimizado: emoji 44dp, checkbox 40dp, edit 36dp, spacing reducido
+- Animación de completado arreglada (escala 1f → 1.02f)
+- Bordes redondeados 12dp en emojis del selector
+- Eliminado worker redundante TaskReminderWorker periódico
+- SmartNotificationWorker de cada 1h a cada 3h
+- Horas de silencio en notificaciones (22:00–07:59 / 23:00–06:59)
 
 ### v2.2.0 (febrero 2026)
 - Habit Tracker: nueva pantalla de seguimiento de hábitos diarios
