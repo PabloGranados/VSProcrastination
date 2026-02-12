@@ -1,14 +1,28 @@
 # VS Procrastination
 
-**v2.2.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.2.1** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
 
 ## Descargar APK
 
-📲 **[Descargar VS Procrastination v2.2.0](releases/VS-Procrastination-v2.2.0.apk)**
+📲 **[Descargar VS Procrastination v2.2.1](releases/VS-Procrastination-v2.2.1.apk)**
 
 > Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
+
+## Novedades en v2.2.1
+
+### 🎨 Corrección de UI — Habit Tracker
+- **Emojis ya no se recortan**: cada emoji ahora vive dentro de un contenedor de tamaño fijo (`Box(44.dp)`) con alineación centrada y `lineHeight` explícito, evitando el clipping que ocurría con ciertos emojis
+- **Emojis del selector más legibles**: tamaño aumentado de 20sp a 22sp con `lineHeight` corregido
+- **Animación de completado arreglada**: la escala al marcar un hábito era un no-op (`1f → 1f`), ahora hay feedback visual sutil (`1f → 1.02f`)
+- **Bug de tipo corregido** en `EmptyHabitsState`: comparaba `Dp` con `Modifier`, ahora usa lógica limpia con `screenWidthDp`
+
+### 🔔 Notificaciones — Horas de silencio
+- **TaskReminderWorker**: añadida ventana de silencio **22:00–7:59** — era el culpable principal de notificaciones a las 3AM
+- **SmartNotificationWorker**: añadida ventana de silencio **22:00–7:59** al inicio de `doWork()` para bloquear cualquier envío fuera de horario (incluyendo tareas "urgentes" de madrugada)
+- **DeadlineCountdownWorker**: añadida ventana de silencio **23:00–6:59** (más permisiva porque los deadlines son más críticos)
+- Justificación: las notificaciones nocturnas interrumpen el sueño y generan asociación negativa con la app (Exelmans & Van den Bulck, 2016)
 
 ## Novedades en v2.2.0
 
