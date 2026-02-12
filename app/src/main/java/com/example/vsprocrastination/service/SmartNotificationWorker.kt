@@ -175,6 +175,13 @@ class SmartNotificationWorker(
     )
     
     override suspend fun doWork(): Result {
+        // ===== HORAS DE SILENCIO (22:00 - 7:59) =====
+        // Las notificaciones "inteligentes" solo tienen sentido en horas de actividad.
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        if (hour >= 22 || hour < 8) {
+            return Result.success()
+        }
+        
         // Verificar preferencias del usuario antes de notificar
         val prefsManager = PreferencesManager(applicationContext)
         val naggingEnabled = prefsManager.naggingEnabled.first()
@@ -183,7 +190,6 @@ class SmartNotificationWorker(
         val taskDao = db.taskDao()
         val tasks = taskDao.getAllTasksSync()
         
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val pendingTasks = tasks.filter { !it.isCompleted }
         val todayKey = StreakCalculator.dayKey(System.currentTimeMillis())
         val completedToday = tasks.filter { 

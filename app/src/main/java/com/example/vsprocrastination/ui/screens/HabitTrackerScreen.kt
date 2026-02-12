@@ -139,24 +139,29 @@ fun HabitTrackerScreen(
 @Composable
 private fun EmptyHabitsState(onAddClick: () -> Unit) {
     val screenWidth = LocalConfiguration.current.screenWidthDp
-    val maxWidth = if (screenWidth >= 600) 400.dp else Modifier.fillMaxWidth()
     
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(
-            modifier = if (maxWidth is Modifier) 
-                Modifier.fillMaxWidth().padding(32.dp) 
+            modifier = if (screenWidth >= 600) 
+                Modifier.widthIn(max = 400.dp).padding(32.dp) 
             else 
-                Modifier.widthIn(max = 400.dp).padding(32.dp),
+                Modifier.fillMaxWidth().padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "🔄",
-                fontSize = 64.sp
-            )
+            Box(
+                modifier = Modifier.size(80.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🔄",
+                    fontSize = 56.sp,
+                    lineHeight = 64.sp
+                )
+            }
             Text(
                 text = "Sin hábitos aún",
                 style = MaterialTheme.typography.headlineSmall,
@@ -297,9 +302,9 @@ private fun HabitCard(
     val isCompleted = habitWithStatus.isCompletedToday
     val streak = habitWithStatus.currentStreak
     
-    // Animación del check
+    // Animación satisfactoria al completar
     val scale by animateFloatAsState(
-        targetValue = if (isCompleted) 1f else 1f,
+        targetValue = if (isCompleted) 1.02f else 1f,
         animationSpec = spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium),
         label = "scale"
     )
@@ -324,11 +329,17 @@ private fun HabitCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Emoji del hábito
-            Text(
-                text = habit.emoji,
-                fontSize = 28.sp
-            )
+            // Emoji del hábito — en Box de tamaño fijo para evitar recorte
+            Box(
+                modifier = Modifier.size(44.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = habit.emoji,
+                    fontSize = 28.sp,
+                    lineHeight = 36.sp
+                )
+            }
             
             // Nombre + racha
             Column(modifier = Modifier.weight(1f)) {
@@ -640,7 +651,11 @@ private fun EmojiSelector(
                             .clickable { onEmojiSelected(emoji) },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = emoji, fontSize = 20.sp)
+                        Text(
+                            text = emoji,
+                            fontSize = 22.sp,
+                            lineHeight = 28.sp
+                        )
                     }
                 }
             }

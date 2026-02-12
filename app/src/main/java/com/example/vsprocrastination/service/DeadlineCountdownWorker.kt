@@ -119,6 +119,14 @@ class DeadlineCountdownWorker(
     )
     
     override suspend fun doWork(): Result {
+        // ===== HORAS DE SILENCIO (23:00 - 6:59) =====
+        // Deadlines a las 3AM no necesitan notificación inmediata.
+        // Se usa ventana más corta (23-7) porque deadlines son más urgentes.
+        val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        if (currentHour >= 23 || currentHour < 7) {
+            return Result.success()
+        }
+        
         // Verificar si el usuario tiene los recordatorios de deadline habilitados
         val prefsManager = PreferencesManager(applicationContext)
         val deadlineRemindersEnabled = prefsManager.deadlineRemindersEnabled.first()

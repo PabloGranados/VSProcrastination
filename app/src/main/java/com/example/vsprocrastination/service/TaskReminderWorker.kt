@@ -195,6 +195,16 @@ class TaskReminderWorker(
         val isOverdue = inputData.getBoolean(KEY_IS_OVERDUE, false)
         val type = inputData.getString(KEY_NOTIFICATION_TYPE) ?: TYPE_GENTLE
         
+        // ===== HORAS DE SILENCIO (22:00 - 7:59) =====
+        // No molestar al usuario mientras duerme.
+        // Justificación: Las notificaciones nocturnas/madrugada son
+        // contraproducentes — interrumpen el sueño y generan asociación
+        // negativa con la app (Exelmans & Van den Bulck, 2016).
+        val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        if (currentHour >= 22 || currentHour < 8) {
+            return Result.success()
+        }
+        
         // Verificar preferencias del usuario
         val prefsManager = PreferencesManager(applicationContext)
         val naggingEnabled = prefsManager.naggingEnabled.first()
