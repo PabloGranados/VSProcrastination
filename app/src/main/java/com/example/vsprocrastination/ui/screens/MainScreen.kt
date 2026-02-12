@@ -38,6 +38,8 @@ import com.example.vsprocrastination.data.model.Subtask
 import com.example.vsprocrastination.data.model.Task
 import com.example.vsprocrastination.ui.viewmodel.MainUiState
 import com.example.vsprocrastination.ui.viewmodel.MainViewModel
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -163,10 +165,30 @@ fun MainScreen(
 }
 
 /**
- * Contenido principal: tarea sugerida + lista secundaria.
+ * Contenido principal con layout adaptativo.
+ * Compacto (teléfono) o expandido (tablet/landscape).
  */
 @Composable
 private fun MainContent(
+    uiState: MainUiState,
+    viewModel: MainViewModel,
+    onNavigateToWeeklySummary: () -> Unit = {}
+) {
+    val configuration = LocalConfiguration.current
+    val isExpandedScreen = configuration.screenWidthDp >= 600
+
+    if (isExpandedScreen) {
+        ExpandedMainContent(uiState, viewModel, onNavigateToWeeklySummary)
+    } else {
+        CompactMainContent(uiState, viewModel, onNavigateToWeeklySummary)
+    }
+}
+
+/**
+ * Layout compacto (teléfono vertical): columna única.
+ */
+@Composable
+private fun CompactMainContent(
     uiState: MainUiState,
     viewModel: MainViewModel,
     onNavigateToWeeklySummary: () -> Unit = {}
@@ -291,6 +313,171 @@ private fun MainContent(
                     onEdit = { viewModel.startEditingTask(task) }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+/**
+ * Layout expandido (tablet/landscape): dos paneles.
+ * Izquierda: tarea hero + calendario.
+ * Derecha: cola de tareas restantes.
+ */
+@Composable
+private fun ExpandedMainContent(
+    uiState: MainUiState,
+    viewModel: MainViewModel,
+    onNavigateToWeeklySummary: () -> Unit = {}
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+    ) {
+        // Header completo
+        StatsHeader(uiState, onNavigateToWeeklySummary)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Panel izquierdo: tarea hero + calendario
+            Column(
+                modifier = Modifier
+                    .weight(0.55f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Frase motivacional
+                if (uiState.motivationalPhrase.isNotEmpty()) {
+                    Text(
+                        text = uiState.motivationalPhrase,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                // Tarea sugerida hero
+                uiState.suggestedTask?.let { task ->
+                    SuggestedTaskCard(
+                        task = task,
+                        subtasks = uiState.suggestedTaskSubtasks,
+                        onStartClick = { viewModel.startSuggestedTask() },
+                        onCompleteClick = { viewModel.completeCurrentTask() },
+                        onSkipClick = { viewModel.skipSuggestedTask() },
+                        onEditClick = { viewModel.startEditingTask(task) },
+                        onSubtaskToggle = { id, completed -> viewModel.toggleSubtask(id, completed) }
+                    )
+                }
+
+                // Calendario de contribuciones
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        ContributionCalendar(tasks = uiState.allTasks)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Hoy: ${uiState.stats.completedTodayCount}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Semana: ${uiState.stats.completedThisWeekCount}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Total: ${uiState.stats.totalCompletedCount}/${uiState.stats.totalTasksCount}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(72.dp))
+            }
+
+            // Panel derecho: cola de tareas
+            LazyColumn(
+                modifier = Modifier.weight(0.45f),
+                contentPadding = PaddingValues(bottom = 88.dp)
+            ) {
+                if (uiState.remainingTasks.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Cola de tareas (${uiState.remainingTasks.size}):",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (uiState.skippedTaskIds.isNotEmpty()) {
+                                TextButton(
+                                    onClick = { viewModel.resetSkippedTasks() },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Text("Resetear saltadas", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    items(uiState.remainingTasks, key = { it.id }) { task ->
+                        SecondaryTaskItem(
+                            task = task,
+                            isSkipped = task.id in uiState.skippedTaskIds,
+                            onDelete = { viewModel.deleteTask(task) },
+                            onEdit = { viewModel.startEditingTask(task) }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                } else {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("📭", fontSize = 32.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "No hay más tareas en cola",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -650,6 +837,15 @@ private fun FocusModeView(
 ) {
     val timerState = uiState.timerState
     val progress = timerState.progress
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    val focusPhrase = remember { 
+        com.example.vsprocrastination.domain.MotivationalPhrases.getContextualPhrase(isFocusMode = true) 
+    }
+    val taskName = timerState.taskName.ifEmpty { 
+        uiState.suggestedTask?.name ?: "Tarea" 
+    }
     
     Box(
         modifier = Modifier
@@ -664,9 +860,93 @@ private fun FocusModeView(
             ),
         contentAlignment = Alignment.Center
     ) {
+        if (isLandscape) {
+            // Landscape: layout horizontal de dos paneles
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 48.dp, vertical = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(48.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Izquierda: información de la tarea
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "🔒 MODO ENFOQUE",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = taskName,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = focusPhrase,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                // Derecha: timer + controles
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = timerState.formattedTime,
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 72.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth(0.7f)
+                            .height(6.dp),
+                        color = Color.White,
+                        trackColor = Color.White.copy(alpha = 0.2f),
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        OutlinedButton(
+                            onClick = { viewModel.cancelFocusMode() },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Pausar")
+                        }
+                        Button(
+                            onClick = { viewModel.completeCurrentTask() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.White,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("¡Terminé!")
+                        }
+                    }
+                }
+            }
+        } else {
+        // Portrait: layout vertical
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
+                .widthIn(max = 480.dp)
                 .padding(32.dp)
                 .verticalScroll(rememberScrollState())
         ) {
@@ -679,9 +959,7 @@ private fun FocusModeView(
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                text = timerState.taskName.ifEmpty { 
-                    uiState.suggestedTask?.name ?: "Tarea" 
-                },
+                text = taskName,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -714,9 +992,6 @@ private fun FocusModeView(
             Spacer(modifier = Modifier.height(16.dp))
             
             // Frase motivacional contextual
-            val focusPhrase = remember { 
-                com.example.vsprocrastination.domain.MotivationalPhrases.getContextualPhrase(isFocusMode = true) 
-            }
             Text(
                 text = focusPhrase,
                 style = MaterialTheme.typography.bodyMedium,
@@ -754,6 +1029,7 @@ private fun FocusModeView(
                 }
             }
         }
+        }
     }
 }
 
@@ -762,9 +1038,13 @@ private fun FocusModeView(
  */
 @Composable
 private fun EmptyState(onAddClick: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .widthIn(max = 480.dp)
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -798,6 +1078,7 @@ private fun EmptyState(onAddClick: () -> Unit) {
             Spacer(modifier = Modifier.width(8.dp))
             Text("Agregar tarea")
         }
+    }
     }
 }
 

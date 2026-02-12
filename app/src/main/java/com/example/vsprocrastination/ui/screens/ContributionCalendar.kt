@@ -16,23 +16,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.sp
 import com.example.vsprocrastination.data.model.Task
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * ContributionCalendar — Calendario de actividad estilo GitHub.
+ * ContributionCalendar — Mapa de calor de actividad diaria.
  * 
  * JUSTIFICACIÓN CIENTÍFICA (Jerry Seinfeld — "Don't Break the Chain"):
  * La visualización de días consecutivos con actividad crea un
- * compromiso psicológico poderoso. Ver una "cadena" de días verdes
+ * compromiso psicológico poderoso. Ver una "cadena" de días coloreados
  * activa la aversión a la pérdida: romper la cadena duele más que
- * el esfuerzo de mantenerla. GitHub usa exactamente este principio
- * para incentivar contribuciones diarias a open source.
+ * el esfuerzo de mantenerla. Los mapas de calor de actividad son un
+ * patrón de visualización ampliamente usado para incentivar constancia.
  * 
  * JUSTIFICACIÓN ADICIONAL (B.J. Fogg — "Tiny Habits"):
- * La celebración visual inmediata (cuadro verde al completar)
+ * La celebración visual inmediata (cuadro coloreado al completar)
  * refuerza el comportamiento. El calendario actúa como un registro
  * tangible de progreso que combate el "descounting hiperbólico" —
  * la tendencia a subestimar logros pasados.
@@ -48,7 +49,7 @@ data class DayActivity(
 )
 
 /**
- * Componente de calendario de contribuciones (estilo GitHub).
+ * Componente de mapa de calor de actividad.
  * Muestra las últimas 15 semanas de actividad con cuadros coloreados
  * según el número de tareas completadas cada día.
  */
@@ -58,6 +59,13 @@ fun ContributionCalendar(
     modifier: Modifier = Modifier,
     onDayClick: (DayActivity) -> Unit = {}
 ) {
+    val configuration = LocalConfiguration.current
+    val isExpanded = configuration.screenWidthDp >= 600
+    val cellSize = if (isExpanded) 18.dp else 14.dp
+    val cellSpacing = if (isExpanded) 3.dp else 2.dp
+    val labelColumnWidth = if (isExpanded) 24.dp else 20.dp
+    val cellStep = cellSize + cellSpacing
+
     val activityData = remember(tasks) { buildActivityData(tasks) }
     val weeks = remember(activityData) { groupIntoWeeks(activityData) }
     var selectedDay by remember { mutableStateOf<DayActivity?>(null) }
@@ -116,13 +124,13 @@ fun ContributionCalendar(
         Row {
             // Espacio para alinear con las columnas
             Column(
-                modifier = Modifier.width(20.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                modifier = Modifier.width(labelColumnWidth),
+                verticalArrangement = Arrangement.spacedBy(cellSpacing)
             ) {
                 val dayLabels = listOf("", "L", "", "M", "", "V", "")
                 dayLabels.forEach { label ->
                     Box(
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(cellSize),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -138,12 +146,12 @@ fun ContributionCalendar(
             // Grid de cuadros de actividad
             LazyRow(
                 state = listState,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(cellSpacing),
                 modifier = Modifier.weight(1f)
             ) {
                 items(weeks.size) { weekIndex ->
                     val week = weeks[weekIndex]
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(cellSpacing)) {
                         week.forEach { day ->
                             val level = getActivityLevel(day.completedCount)
                             val isToday = isToday(day.date)
@@ -153,8 +161,8 @@ fun ContributionCalendar(
                             
                             Box(
                                 modifier = Modifier
-                                    .size(14.dp)
-                                    .clip(RoundedCornerShape(2.dp))
+                                    .size(cellSize)
+                                    .clip(RoundedCornerShape(3.dp))
                                     .background(level.color())
                                     .then(
                                         if (isToday) Modifier.border(
@@ -185,7 +193,7 @@ fun ContributionCalendar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, top = 4.dp)
+                .padding(start = labelColumnWidth, top = 4.dp)
         ) {
             val monthLabels = getMonthLabels(weeks)
             monthLabels.forEach { (label, offset) ->
@@ -194,7 +202,7 @@ fun ContributionCalendar(
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 8.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = (offset * 16).dp)
+                    modifier = Modifier.padding(start = cellStep * offset)
                 )
             }
         }
@@ -277,10 +285,10 @@ enum class ActivityLevels {
     fun color(): Color {
         return when (this) {
             NONE -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-            LOW -> Color(0xFF9BE9A8)       // Verde claro
-            MEDIUM -> Color(0xFF40C463)     // Verde medio  
-            HIGH -> Color(0xFF30A14E)       // Verde oscuro
-            VERY_HIGH -> Color(0xFF216E39)  // Verde muy oscuro
+            LOW -> Color(0xFFFFE0B2)       // Ámbar claro
+            MEDIUM -> Color(0xFFFFB74D)    // Ámbar medio
+            HIGH -> Color(0xFFF57C00)      // Naranja oscuro
+            VERY_HIGH -> Color(0xFFE65100) // Naranja profundo
         }
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.vsprocrastination.data.preferences.PreferencesManager
@@ -58,11 +59,14 @@ fun SettingsScreen(
             )
         }
     ) { padding ->
+        val screenWidth = LocalConfiguration.current.screenWidthDp
+        val horizontalPadding = if (screenWidth >= 840) 80.dp
+            else if (screenWidth >= 600) 48.dp else 16.dp
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = horizontalPadding, vertical = 16.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -343,7 +347,7 @@ fun SettingsScreen(
             
             // === VERSIÓN ===
             Text(
-                text = "VS Procrastination v2.0",
+                text = "VS Procrastination v2.1.2",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),

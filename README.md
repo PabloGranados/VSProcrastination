@@ -1,26 +1,41 @@
 # VS Procrastination
 
-**v2.1** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.1.2** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
 
 ## Descargar APK
 
-📲 **[Descargar VS Procrastination v2.1](releases/VS-Procrastination-v2.1.apk)**
+📲 **[Descargar VS Procrastination v2.1.2](releases/VS-Procrastination-v2.1.2.apk)**
 
 > Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
 
-## Novedades en v2.1
+## Novedades en v2.1.2
 
-### 📅 Calendario de contribuciones (estilo GitHub)
-- **Grid visual de actividad** de las últimas 15 semanas con cuadros coloreados en 5 niveles de verde
+### 📱 Diseño responsive para tablets y landscape
+- **Layout de dos paneles** en tablets y modo horizontal: tarea hero a la izquierda, cola de tareas a la derecha
+- **Modo Enfoque adaptativo**: en landscape muestra información de la tarea y timer lado a lado, aprovechando el espacio horizontal
+- **Padding dinámico** en todas las pantallas: Ajustes y Resumen Semanal se adaptan al ancho disponible (compact < 600dp, medium 600-840dp, expanded > 840dp)
+- **Estado vacío centrado** con ancho máximo para legibilidad en pantallas grandes
+- **Calendario de actividad responsive**: celdas más grandes (18dp) y espaciado ampliado en tablets
+
+### 🎨 Mejoras de diseño
+- **Paleta del calendario renovada**: colores ámbar/naranja que armonizan con el tema de la app (antes usaba verdes genéricos)
+- **Calendario como mapa de calor propio**: diseño visual original con esquinas más redondeadas (3dp) y mejor legibilidad
+- **Versión correcta** mostrada en la pantalla de Ajustes (antes mostraba v2.0)
+- **Corrección de inconsistencias tipográficas** en toda la app
+
+## Novedades anteriores
+
+### 📅 Calendario de actividad con mapa de calor (v2.1)
+- **Grid visual de actividad** de las últimas 15 semanas con cuadros coloreados en 5 niveles
 - Toca cualquier día para ver **los nombres de las tareas** que completaste ese día
 - Borde especial destaca el día de hoy y leyenda de colores (Menos → Más)
 - Reemplaza la barra de progreso genérica en la pantalla principal
 - También aparece en el Resumen Semanal para ver el historial completo
 - Justificación: "Don't Break the Chain" (Seinfeld) + Tiny Habits (B.J. Fogg)
 
-### 🔔 Sistema de notificaciones inteligente
+### 🔔 Sistema de notificaciones inteligente (v2.1)
 - **Notificaciones basadas en ritmo circadiano**: diferentes mensajes según la hora del día
   - **Mañana (8-10h)**: Arrancada con la tarea prioritaria + dato sobre cortisol/deep work
   - **Mediodía (12-14h)**: Motivación para tareas rápidas durante la caída post-prandial
@@ -72,7 +87,7 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 | Implementation Intentions (Gollwitzer) | Notificaciones contextuales que anclan la tarea al momento presente |
 | Ley de Fogg | Entrada de tareas con mínima fricción |
 | Ley de Hick | Máximo 3-4 opciones en cada selector |
-| Don't Break the Chain (Seinfeld) | Calendario de contribuciones estilo GitHub con historial de 15 semanas |
+| Don't Break the Chain (Seinfeld) | Mapa de calor de actividad con historial de 15 semanas |
 | Ritmos Circadianos | Notificaciones adaptadas a la hora del día (cortisol matutino, bajón post-prandial, pico vespertino) |
 | Planning Fallacy (Kahneman) | Reflexión nocturna para planificar el día siguiente |
 
@@ -112,7 +127,7 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 ### Rachas y motivación
 
 - Racha de días consecutivos completando al menos una tarea
-- Calendario de contribuciones también visible en el Resumen Semanal
+- Mapa de calor de actividad también visible en el Resumen Semanal
 - Animación de celebración al completar una tarea (confeti)
 - Frases motivacionales contextuales: cambian según si la tarea es difícil, rápida, si llevas racha, o si hay tareas vencidas
 - Resumen semanal con estadísticas, reflexión adaptativa y datos curiosos sobre procrastinación
@@ -127,8 +142,8 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 
 ### Progreso y calendario
 
-- **Calendario de contribuciones estilo GitHub** con 15 semanas de historial
-- Cuadros coloreados en 5 niveles de verde según tareas completadas por día
+- **Mapa de calor de actividad** con 15 semanas de historial
+- Cuadros coloreados en 5 niveles de ámbar/naranja según tareas completadas por día
 - Detalle al tocar un día: muestra los nombres de las tareas completadas
 - Borde especial para el día actual
 - Contadores: tareas completadas hoy, esta semana, total pendientes
@@ -182,10 +197,10 @@ app/src/main/java/com/example/vsprocrastination/
 │   └── BootReceiver.kt          # Reprograma workers tras reboot
 ├── ui/
 │   ├── screens/
-│   │   ├── MainScreen.kt        # Pantalla principal
-│   │   ├── ContributionCalendar.kt # Calendario de actividad estilo GitHub
-│   │   ├── SettingsScreen.kt    # Configuración
-│   │   └── WeeklySummaryScreen.kt # Resumen semanal
+│   │   ├── MainScreen.kt        # Pantalla principal (layout adaptativo compact/expanded)
+│   │   ├── ContributionCalendar.kt # Mapa de calor de actividad (responsive)
+│   │   ├── SettingsScreen.kt    # Configuración (padding adaptativo)
+│   │   └── WeeklySummaryScreen.kt # Resumen semanal (padding adaptativo)
 │   ├── viewmodel/
 │   │   └── MainViewModel.kt     # Estado central de la app
 │   └── theme/
@@ -212,14 +227,25 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 
 ## Changelog
 
+### v2.1.2 (febrero 2026)
+- Diseño responsive completo para tablets y modo landscape
+- Layout de dos paneles en pantalla principal para pantallas ≥ 600dp
+- Modo Enfoque con layout horizontal en landscape
+- Padding dinámico en Ajustes y Resumen Semanal según ancho de pantalla
+- Calendario de actividad con celdas adaptativas (14dp compacto / 18dp expandido)
+- Paleta de colores del calendario cambiada a ámbar/naranja (acorde al tema)
+- Mapa de calor de actividad con diseño visual propio
+- Corregida versión mostrada en pantalla de Ajustes
+- Estado vacío centrado con ancho máximo para tablets
+
 ### v2.1 (febrero 2026)
-- Calendario de contribuciones estilo GitHub con 15 semanas de historial
+- Mapa de calor de actividad con 15 semanas de historial
 - Detalle de tareas completadas por día al tocar el calendario
 - Sistema de notificaciones inteligente basado en ritmo circadiano
 - Notificaciones muestran el nombre real de la tarea prioritaria
 - SmartNotificationWorker con motivación científica según hora del día
 - Protección de racha y alertas de deadline inminente
-- Reemplazada barra de progreso genérica por el calendario en pantalla principal
+- Reemplazada barra de progreso genérica por el mapa de calor en pantalla principal
 
 ### v2.0 (febrero 2026)
 - Sincronización entre dispositivos con Firebase (Auth + Firestore)
@@ -248,7 +274,7 @@ Para generar el APK de release:
 El APK se genera en `app/build/outputs/apk/release/`. Cópialo a la carpeta `releases/` y renómbralo:
 
 ```bash
-cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.1.apk
+cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.1.2.apk
 ```
 
 Para el APK de debug (con firma automática):
