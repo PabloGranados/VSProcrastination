@@ -17,10 +17,7 @@ class BootReceiver : BroadcastReceiver() {
             // Recrear canales de notificación
             TaskReminderWorker.createNotificationChannels(context)
             
-            // Reprogramar recordatorios periódicos
-            TaskReminderWorker.schedulePeriodicReminder(context)
-            
-            // Reprogramar notificaciones inteligentes
+            // Reprogramar notificaciones inteligentes (reemplaza al viejo periodic reminder)
             SmartNotificationWorker.schedule(context)
             
             // Reprogramar countdown de deadlines

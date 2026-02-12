@@ -325,19 +325,27 @@ private fun HabitCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onToggle)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Emoji del hábito — en Box de tamaño fijo para evitar recorte
+            // Emoji del hábito — círculo con fondo sutil para contener visualmente
             Box(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isCompleted)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = habit.emoji,
-                    fontSize = 28.sp,
-                    lineHeight = 36.sp
+                    fontSize = 24.sp,
+                    modifier = Modifier.wrapContentSize(unbounded = true)
                 )
             }
             
@@ -653,8 +661,8 @@ private fun EmojiSelector(
                     ) {
                         Text(
                             text = emoji,
-                            fontSize = 22.sp,
-                            lineHeight = 28.sp
+                            fontSize = 24.sp,
+                            modifier = Modifier.wrapContentSize(unbounded = true)
                         )
                     }
                 }

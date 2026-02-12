@@ -13,15 +13,18 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 ## Novedades en v2.2.1
 
 ### 🎨 Corrección de UI — Habit Tracker
-- **Emojis ya no se recortan**: cada emoji ahora vive dentro de un contenedor de tamaño fijo (`Box(44.dp)`) con alineación centrada y `lineHeight` explícito, evitando el clipping que ocurría con ciertos emojis
-- **Emojis del selector más legibles**: tamaño aumentado de 20sp a 22sp con `lineHeight` corregido
+- **Emojis ya no se recortan**: cada emoji vive dentro de un círculo de 48dp con fondo sutil (`surfaceVariant` / `primary`) y `wrapContentSize(unbounded = true)` — el glifo nunca se clipea sin importar el dispositivo
+- **Emojis del selector más legibles**: tamaño aumentado a 24sp con renderizado sin recorte
 - **Animación de completado arreglada**: la escala al marcar un hábito era un no-op (`1f → 1f`), ahora hay feedback visual sutil (`1f → 1.02f`)
 - **Bug de tipo corregido** en `EmptyHabitsState`: comparaba `Dp` con `Modifier`, ahora usa lógica limpia con `screenWidthDp`
+- Padding vertical de cada card aumentado de 12dp a 16dp para mejor espaciado
 
-### 🔔 Notificaciones — Horas de silencio
-- **TaskReminderWorker**: añadida ventana de silencio **22:00–7:59** — era el culpable principal de notificaciones a las 3AM
-- **SmartNotificationWorker**: añadida ventana de silencio **22:00–7:59** al inicio de `doWork()` para bloquear cualquier envío fuera de horario (incluyendo tareas "urgentes" de madrugada)
-- **DeadlineCountdownWorker**: añadida ventana de silencio **23:00–6:59** (más permisiva porque los deadlines son más críticos)
+### 🔔 Notificaciones — Menos spam + horas de silencio
+- **Eliminado worker redundante**: `TaskReminderWorker` periódico (cada 2h) ya no se programa — duplicaba lo que SmartNotificationWorker ya hace mejor
+- **Al abrir la app se cancela** el worker periódico viejo activamente con `cancelPeriodicReminder()` 
+- **SmartNotificationWorker de cada 1h a cada 3h**: ~5 notificaciones útiles/día en lugar de ~14
+- **Política UPDATE**: el nuevo intervalo toma efecto inmediato sin reinstalar
+- **Horas de silencio**: TaskReminderWorker y SmartNotificationWorker callan de 22:00 a 7:59; DeadlineCountdownWorker de 23:00 a 6:59
 - Justificación: las notificaciones nocturnas interrumpen el sueño y generan asociación negativa con la app (Exelmans & Van den Bulck, 2016)
 
 ## Novedades en v2.2.0

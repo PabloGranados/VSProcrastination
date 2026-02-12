@@ -73,8 +73,8 @@ class SmartNotificationWorker(
          */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<SmartNotificationWorker>(
-                1, TimeUnit.HOURS,
-                15, TimeUnit.MINUTES
+                3, TimeUnit.HOURS,
+                30, TimeUnit.MINUTES
             )
                 .setInputData(workDataOf(
                     KEY_NOTIFICATION_CATEGORY to CATEGORY_SMART_PERIODIC
@@ -89,7 +89,7 @@ class SmartNotificationWorker(
             
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 WORK_TAG,
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,
                 request
             )
         }

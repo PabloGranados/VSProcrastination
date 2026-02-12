@@ -233,11 +233,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun initializeNotifications() {
         TaskReminderWorker.createNotificationChannels(context)
-        TaskReminderWorker.schedulePeriodicReminder(context)
+        // Cancelar el viejo recordatorio periódico redundante (era cada 2h,
+        // pero SmartNotificationWorker ya cubre esta función mejor)
+        TaskReminderWorker.cancelPeriodicReminder(context)
         // Countdown estilo Duolingo para tareas a <2h del deadline
         DeadlineCountdownWorker.createNotificationChannel(context)
         DeadlineCountdownWorker.schedule(context)
         // Sistema de notificaciones inteligente basado en ciencia conductual
+        // Es el único worker periódico general: cada 3h con ventanas circadianas
         SmartNotificationWorker.schedule(context)
     }
     

@@ -53,7 +53,9 @@ class TaskReminderWorker(
         
         /**
          * Programa un recordatorio periódico cada 2 horas.
-         * "¿Ya empezaste tu tarea más importante?"
+         * DEPRECADO: Usar SmartNotificationWorker en su lugar, que tiene
+         * mensajes contextuales mejores y ventanas circadianas.
+         * Se mantiene el método solo para referencia/nagging.
          */
         fun schedulePeriodicReminder(context: Context) {
             val request = PeriodicWorkRequestBuilder<TaskReminderWorker>(
@@ -76,6 +78,14 @@ class TaskReminderWorker(
                 ExistingPeriodicWorkPolicy.KEEP,
                 request
             )
+        }
+        
+        /**
+         * Cancela el recordatorio periódico redundante.
+         * SmartNotificationWorker ahora cumple esta función.
+         */
+        fun cancelPeriodicReminder(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(WORK_TAG_PERIODIC)
         }
         
         /**
