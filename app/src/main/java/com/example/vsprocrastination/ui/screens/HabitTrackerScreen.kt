@@ -158,8 +158,7 @@ private fun EmptyHabitsState(onAddClick: () -> Unit) {
             ) {
                 Text(
                     text = "🔄",
-                    fontSize = 56.sp,
-                    lineHeight = 64.sp
+                    fontSize = 48.sp
                 )
             }
             Text(
@@ -329,23 +328,22 @@ private fun HabitCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Emoji del hábito — círculo con fondo sutil para contener visualmente
+            // Emoji del hábito — círculo con fondo sutil (sin clip para no recortar)
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(CircleShape)
                     .background(
-                        if (isCompleted)
+                        color = if (isCompleted)
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                         else
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = habit.emoji,
-                    fontSize = 24.sp,
-                    modifier = Modifier.wrapContentSize(unbounded = true)
+                    fontSize = 24.sp
                 )
             }
             
@@ -641,12 +639,12 @@ private fun EmojiSelector(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .clip(RoundedCornerShape(8.dp))
                             .background(
-                                if (isSelected)
+                                color = if (isSelected)
                                     MaterialTheme.colorScheme.primaryContainer
                                 else
-                                    Color.Transparent
+                                    Color.Transparent,
+                                shape = RoundedCornerShape(8.dp)
                             )
                             .border(
                                 width = if (isSelected) 2.dp else 0.dp,
@@ -661,8 +659,7 @@ private fun EmojiSelector(
                     ) {
                         Text(
                             text = emoji,
-                            fontSize = 24.sp,
-                            modifier = Modifier.wrapContentSize(unbounded = true)
+                            fontSize = 24.sp
                         )
                     }
                 }
