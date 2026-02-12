@@ -11,6 +11,8 @@ import androidx.work.*
 import com.example.vsprocrastination.MainActivity
 import com.example.vsprocrastination.R
 import com.example.vsprocrastination.data.database.AppDatabase
+import com.example.vsprocrastination.data.preferences.PreferencesManager
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
 /**
@@ -117,6 +119,13 @@ class DeadlineCountdownWorker(
     )
     
     override suspend fun doWork(): Result {
+        // Verificar si el usuario tiene los recordatorios de deadline habilitados
+        val prefsManager = PreferencesManager(applicationContext)
+        val deadlineRemindersEnabled = prefsManager.deadlineRemindersEnabled.first()
+        if (!deadlineRemindersEnabled) {
+            return Result.success()
+        }
+        
         val db = AppDatabase.getDatabase(applicationContext)
         val taskDao = db.taskDao()
         

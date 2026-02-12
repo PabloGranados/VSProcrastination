@@ -149,11 +149,19 @@ class TaskConverters {
     fun fromDifficulty(difficulty: Difficulty): String = difficulty.name
     
     @TypeConverter
-    fun toDifficulty(value: String): Difficulty = Difficulty.valueOf(value)
+    fun toDifficulty(value: String): Difficulty = try {
+        Difficulty.valueOf(value)
+    } catch (_: IllegalArgumentException) {
+        Difficulty.EASY
+    }
     
     @TypeConverter
     fun fromPriority(priority: Priority): String = priority.name
     
     @TypeConverter
-    fun toPriority(value: String): Priority = Priority.valueOf(value)
+    fun toPriority(value: String): Priority = try {
+        Priority.valueOf(value)
+    } catch (_: IllegalArgumentException) {
+        Priority.NORMAL
+    }
 }

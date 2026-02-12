@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.vsprocrastination.BuildConfig
 import com.example.vsprocrastination.data.preferences.PreferencesManager
 import kotlinx.coroutines.launch
 
@@ -347,7 +348,7 @@ fun SettingsScreen(
             
             // === VERSIÓN ===
             Text(
-                text = "VS Procrastination v2.1.2",
+                text = "VS Procrastination v${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),

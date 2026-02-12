@@ -207,14 +207,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     /**
      * Programa recordatorios insistentes para tareas vencidas.
+     * Solo si el usuario tiene nagging habilitado.
      */
     private fun scheduleOverdueReminders(tasks: List<Task>) {
-        val now = System.currentTimeMillis()
-        tasks.filter { 
-            !it.isCompleted && !it.isStarted &&
-            it.deadlineMillis != null && it.deadlineMillis < now 
-        }.forEach { task ->
-            TaskReminderWorker.scheduleNaggingReminder(context, task.name, task.id)
+        viewModelScope.launch {
+            val naggingEnabled = preferencesManager.naggingEnabled.first()
+            if (!naggingEnabled) return@launch
+            
+            val now = System.currentTimeMillis()
+            tasks.filter { 
+                !it.isCompleted && !it.isStarted &&
+                it.deadlineMillis != null && it.deadlineMillis < now 
+            }.forEach { task ->
+                TaskReminderWorker.scheduleNaggingReminder(context, task.name, task.id)
+            }
         }
     }
     
@@ -627,7 +633,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     syncManager.syncAll()
                     preferencesManager.setLastSyncTimestamp()
                 } catch (e: Exception) {
-                    android.util.Log.w("MainViewModel", "Auto-sync failed", e)
+                    if (com.example.vsprocrastination.BuildConfig.DEBUG) {
+                        android.util.Log.w("MainViewModel", "Auto-sync failed", e)
+                    }
                 }
             }
         }

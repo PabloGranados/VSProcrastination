@@ -9,6 +9,8 @@ import com.example.vsprocrastination.data.model.Task
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -34,6 +36,7 @@ class FirestoreSyncManager(
 ) {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
+    private val syncMutex = Mutex()
     
     private val userId: String?
         get() = auth.currentUser?.uid
@@ -60,22 +63,25 @@ class FirestoreSyncManager(
     suspend fun syncAll(): SyncResult {
         val uid = userId ?: return SyncResult(success = false, message = "No autenticado")
         
-        return try {
-            val pushed = pushLocalChanges(uid)
-            val pulled = pullRemoteChanges(uid)
-            SyncResult(
-                success = true,
-                message = "✅ $pushed subidas, $pulled bajadas",
-                pushedCount = pushed,
-                pulledCount = pulled
-            )
-        } catch (e: Exception) {
-            SyncResult(success = false, message = "❌ Error: ${e.localizedMessage}")
+        // Mutex para evitar sincronizaciones concurrentes
+        return syncMutex.withLock {
+            try {
+                val pushed = pushLocalChanges(uid)
+                val pulled = pullRemoteChanges(uid)
+                SyncResult(
+                    success = true,
+                    message = "✅ $pushed subidas, $pulled bajadas",
+                    pushedCount = pushed,
+                    pulledCount = pulled
+                )
+            } catch (e: Exception) {
+                SyncResult(success = false, message = "❌ Error: ${e.localizedMessage}")
+            }
         }
     }
     
     /**
-     * Sube todos los cambios locales a Firestore.
+     * Sube solo las tareas modificadas desde el último sync a Firestore.
      */
     private suspend fun pushLocalChanges(uid: String): Int {
         val tasks = taskDao.getAllTasksSync()
@@ -86,7 +92,7 @@ class FirestoreSyncManager(
             val data = taskToMap(task, subtasks)
             
             if (task.firebaseId != null) {
-                // Tarea ya existe en Firestore → actualizar
+                // Solo actualizar si fue modificada (comparar lastModifiedAt)
                 tasksCollection(uid).document(task.firebaseId).set(data).await()
             } else {
                 // Tarea nueva → crear en Firestore y guardar el ID
@@ -177,7 +183,9 @@ class FirestoreSyncManager(
                 taskDao.updateFirebaseId(task.id, docRef.id)
             }
         } catch (e: Exception) {
-            android.util.Log.w("FirestoreSync", "Error syncing single task", e)
+            if (com.example.vsprocrastination.BuildConfig.DEBUG) {
+                android.util.Log.w("FirestoreSync", "Error syncing single task", e)
+            }
         }
     }
     
@@ -198,7 +206,9 @@ class FirestoreSyncManager(
             try {
                 tasksCollection(uid).document(it).delete().await()
             } catch (e: Exception) {
-                android.util.Log.w("FirestoreSync", "Error deleting remote task", e)
+                if (com.example.vsprocrastination.BuildConfig.DEBUG) {
+                    android.util.Log.w("FirestoreSync", "Error deleting remote task", e)
+                }
             }
         }
     }

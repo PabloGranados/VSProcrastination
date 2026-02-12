@@ -117,9 +117,16 @@ class TaskRepository(
     }
     
     /**
-     * Limpia tareas completadas.
+     * Limpia tareas completadas (local y remota).
      */
     suspend fun clearCompletedTasks() {
+        // Primero borrar de Firestore las tareas completadas que tengan firebaseId
+        val completedTasks = taskDao.getAllTasksSync().filter { it.isCompleted }
+        completedTasks.forEach { task ->
+            if (task.firebaseId != null) {
+                syncManager?.deleteRemoteTask(task.firebaseId)
+            }
+        }
         taskDao.deleteCompletedTasks()
     }
     

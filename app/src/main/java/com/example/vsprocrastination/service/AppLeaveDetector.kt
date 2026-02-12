@@ -23,7 +23,7 @@ import com.example.vsprocrastination.R
 class AppLeaveDetector : BroadcastReceiver() {
     
     companion object {
-        const val NOTIFICATION_ID_RETURN = 5000
+        const val NOTIFICATION_ID_RETURN = 6000
         const val ACTION_APP_LEFT = "com.example.vsprocrastination.APP_LEFT"
     }
     
@@ -60,12 +60,14 @@ class AppLeaveDetector : BroadcastReceiver() {
             "🎯 $taskName te espera. Solo un poco más."
         )
         
+        val selectedMessage = messages.random()
+        
         val notification = NotificationCompat.Builder(context, TaskReminderWorker.NAGGING_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("⚠️ ¡Saliste de la app!")
-            .setContentText(messages.random())
+            .setContentText(selectedMessage)
             .setStyle(NotificationCompat.BigTextStyle().bigText(
-                "${messages.random()}\n\nTu sesión de enfoque para \"$taskName\" sigue activa."
+                "$selectedMessage\n\nTu sesión de enfoque para \"$taskName\" sigue activa."
             ))
             .setContentIntent(openIntent)
             .setOngoing(true)

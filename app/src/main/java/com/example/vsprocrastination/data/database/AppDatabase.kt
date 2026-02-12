@@ -23,7 +23,7 @@ import com.example.vsprocrastination.data.model.TaskConverters
 @Database(
     entities = [Task::class, Subtask::class],
     version = 4,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(TaskConverters::class)
 abstract class AppDatabase : RoomDatabase() {

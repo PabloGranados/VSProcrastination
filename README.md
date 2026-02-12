@@ -1,18 +1,39 @@
 # VS Procrastination
 
-**v2.1.2** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.1.3** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
 
 ## Descargar APK
 
-📲 **[Descargar VS Procrastination v2.1.2](releases/VS-Procrastination-v2.1.2.apk)**
+📲 **[Descargar VS Procrastination v2.1.3](releases/VS-Procrastination-v2.1.3.apk)**
 
 > Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
 
-## Novedades en v2.1.2
+## Novedades en v2.1.3
 
-### 📱 Diseño responsive para tablets y landscape
+### 🐛 Corrección de bugs críticos
+- **Rachas ya no se rompen en Año Nuevo**: corregido el cálculo de `dayKey()` que usaba `year*1000+dayOfYear` — ahora usa epoch days para garantizar consecutividad entre años
+- **Las preferencias de notificación ahora funcionan**: los toggles de "nagging" y "recordatorios de deadline" en Ajustes realmente desactivan las notificaciones (antes eran cosméticos)
+- **Notificaciones consistentes**: corregido bug donde la notificación compacta y expandida mostraban mensajes diferentes
+- **Colisión de notificaciones resuelta**: `AppLeaveDetector` y `DeadlineCountdownWorker` ya no comparten el mismo ID de notificación
+- **Limpieza de tareas completadas sincroniza con Firebase**: al borrar tareas completadas, ahora también se eliminan de Firestore
+- **Versión dinámica**: la pantalla de Ajustes muestra la versión real desde `BuildConfig` en lugar de un texto fijo
+
+### 🛡️ Seguridad y estabilidad
+- **TaskConverters a prueba de crashes**: valores corruptos en la BD ya no causan crash — devuelven defaults seguros
+- **Logs condicionales**: `Log.w()` solo se ejecuta en builds de debug, no en release
+- **ProGuard configurado**: reglas para Room, Firebase, Coroutines, DataStore y enums
+- **Sincronización thread-safe**: añadido Mutex para evitar sync concurrentes en Firestore
+- **Room Schema Export habilitado**: permite verificar integridad de migraciones futuras
+
+### 🔧 Mejoras de código
+- **Código duplicado eliminado**: Workers ahora reutilizan `StreakCalculator` en lugar de duplicar la lógica
+- **Botón "CONTINUAR" corregido**: ya no muestra "25 min" fijo ignorando la configuración del usuario
+
+## Novedades anteriores
+
+### 📱 Diseño responsive para tablets y landscape (v2.1.2)
 - **Layout de dos paneles** en tablets y modo horizontal: tarea hero a la izquierda, cola de tareas a la derecha
 - **Modo Enfoque adaptativo**: en landscape muestra información de la tarea y timer lado a lado, aprovechando el espacio horizontal
 - **Padding dinámico** en todas las pantallas: Ajustes y Resumen Semanal se adaptan al ancho disponible (compact < 600dp, medium 600-840dp, expanded > 840dp)
@@ -24,8 +45,6 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 - **Calendario como mapa de calor propio**: diseño visual original con esquinas más redondeadas (3dp) y mejor legibilidad
 - **Versión correcta** mostrada en la pantalla de Ajustes (antes mostraba v2.0)
 - **Corrección de inconsistencias tipográficas** en toda la app
-
-## Novedades anteriores
 
 ### 📅 Calendario de actividad con mapa de calor (v2.1)
 - **Grid visual de actividad** de las últimas 15 semanas con cuadros coloreados en 5 niveles
@@ -227,6 +246,22 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 
 ## Changelog
 
+### v2.1.3 (febrero 2026)
+- Corregido bug crítico: rachas se rompían en cambio de año (dayKey ahora usa epoch days)
+- Workers respetan preferencias de notificación del usuario (nagging/deadline)
+- Corregido doble random() en notificaciones nagging y AppLeaveDetector
+- Resuelto colisión de Notification IDs entre AppLeaveDetector y DeadlineCountdownWorker
+- clearCompletedTasks ahora elimina también las tareas remotas en Firestore
+- Versión en Ajustes usa BuildConfig.VERSION_NAME dinámicamente
+- TaskConverters con manejo seguro de valores inválidos (no crashea)
+- Eliminado código duplicado en SmartNotificationWorker (usa StreakCalculator)
+- Sincronización protegida con Mutex contra ejecuciones concurrentes
+- Logs condicionales: Log.w solo en BuildConfig.DEBUG
+- ProGuard configurado para Room, Firebase, Coroutines, DataStore y enums
+- Room exportSchema habilitado con directorio de schemas
+- buildConfig = true habilitado para acceso a BuildConfig.VERSION_NAME
+- Botón "CONTINUAR" sin minutos hardcodeados
+
 ### v2.1.2 (febrero 2026)
 - Diseño responsive completo para tablets y modo landscape
 - Layout de dos paneles en pantalla principal para pantallas ≥ 600dp
@@ -274,7 +309,7 @@ Para generar el APK de release:
 El APK se genera en `app/build/outputs/apk/release/`. Cópialo a la carpeta `releases/` y renómbralo:
 
 ```bash
-cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.1.2.apk
+cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.1.3.apk
 ```
 
 Para el APK de debug (con firma automática):

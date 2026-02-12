@@ -96,12 +96,18 @@ object StreakCalculator {
     }
     
     /**
-     * Convierte timestamp en un "día clave" (dayOfYear + year*1000).
-     * Permite comparar días fácilmente.
+     * Convierte timestamp en un "día clave" usando epoch days.
+     * Permite comparar días consecutivos correctamente (incluso entre años).
      */
-    private fun dayKey(timestamp: Long): Int {
+    fun dayKey(timestamp: Long): Int {
         val cal = Calendar.getInstance()
         cal.timeInMillis = timestamp
-        return cal.get(Calendar.YEAR) * 1000 + cal.get(Calendar.DAY_OF_YEAR)
+        // Usar días desde epoch: year*366+dayOfYear sería incorrecto en cambio de año.
+        // Epoch days = total de días desde 1 Jan 1970, garantiza consecutividad.
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return (cal.timeInMillis / (24 * 60 * 60 * 1000L)).toInt()
     }
 }

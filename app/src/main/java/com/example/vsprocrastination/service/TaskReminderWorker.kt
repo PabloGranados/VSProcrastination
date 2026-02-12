@@ -11,6 +11,8 @@ import androidx.work.*
 import com.example.vsprocrastination.MainActivity
 import com.example.vsprocrastination.R
 import com.example.vsprocrastination.data.database.AppDatabase
+import com.example.vsprocrastination.data.preferences.PreferencesManager
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
 /**
@@ -193,6 +195,15 @@ class TaskReminderWorker(
         val isOverdue = inputData.getBoolean(KEY_IS_OVERDUE, false)
         val type = inputData.getString(KEY_NOTIFICATION_TYPE) ?: TYPE_GENTLE
         
+        // Verificar preferencias del usuario
+        val prefsManager = PreferencesManager(applicationContext)
+        val naggingEnabled = prefsManager.naggingEnabled.first()
+        
+        // Si es nagging y el usuario lo desactivó, no enviar
+        if (type == TYPE_NAGGING && !naggingEnabled) {
+            return Result.success()
+        }
+        
         // Si no se proporcionó nombre de tarea, obtener la tarea prioritaria de la BD
         if (taskName.isNullOrEmpty() || taskName == "tu tarea más importante") {
             try {
@@ -279,10 +290,12 @@ class TaskReminderWorker(
             "🚨 RECORDATORIO: $taskName no se va a hacer sola"
         )
         
+        val selectedMessage = messages.random()
+        
         val notification = baseNotificationBuilder(NAGGING_CHANNEL_ID, taskId)
             .setContentTitle("⚠️ ¡Acción requerida!")
-            .setContentText(messages.random())
-            .setStyle(NotificationCompat.BigTextStyle().bigText(messages.random()))
+            .setContentText(selectedMessage)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(selectedMessage))
             .setOngoing(true)
             .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_MAX)

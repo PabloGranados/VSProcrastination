@@ -670,7 +670,7 @@ private fun SuggestedTaskCard(
                 )
             ) {
                 Text(
-                    text = if (task.isStarted) "▶️ CONTINUAR (25 min)" else "🚀 EMPEZAR AHORA",
+                    text = if (task.isStarted) "▶️ CONTINUAR" else "🚀 EMPEZAR AHORA",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )

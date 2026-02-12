@@ -11,6 +11,9 @@ import com.example.vsprocrastination.MainActivity
 import com.example.vsprocrastination.R
 import com.example.vsprocrastination.data.database.AppDatabase
 import com.example.vsprocrastination.data.model.Task
+import com.example.vsprocrastination.data.preferences.PreferencesManager
+import com.example.vsprocrastination.domain.StreakCalculator
+import kotlinx.coroutines.flow.first
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -172,13 +175,21 @@ class SmartNotificationWorker(
     )
     
     override suspend fun doWork(): Result {
+        // Verificar preferencias del usuario antes de notificar
+        val prefsManager = PreferencesManager(applicationContext)
+        val naggingEnabled = prefsManager.naggingEnabled.first()
+        
         val db = AppDatabase.getDatabase(applicationContext)
         val taskDao = db.taskDao()
         val tasks = taskDao.getAllTasksSync()
         
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val pendingTasks = tasks.filter { !it.isCompleted }
-        val completedToday = tasks.filter { it.isCompleted && it.completedAt != null && isToday(it.completedAt) }
+        val todayKey = StreakCalculator.dayKey(System.currentTimeMillis())
+        val completedToday = tasks.filter { 
+            it.isCompleted && it.completedAt != null && 
+            StreakCalculator.dayKey(it.completedAt) == todayKey 
+        }
         
         // Obtener la tarea top por prioridad
         val topTask = pendingTasks
@@ -186,9 +197,9 @@ class SmartNotificationWorker(
         val topTaskName = topTask?.name ?: "tu tarea más importante"
         val quickTaskCount = pendingTasks.count { it.isQuickTask }
         
-        // Calcular racha
+        // Calcular racha usando StreakCalculator (sin duplicar lógica)
         val hasCompletedToday = completedToday.isNotEmpty()
-        val streakDays = calculateSimpleStreak(tasks)
+        val streakDays = StreakCalculator.calculateCurrentStreak(tasks)
         
         // Si no hay tareas pendientes, no molestar
         if (pendingTasks.isEmpty()) return Result.success()
@@ -196,7 +207,8 @@ class SmartNotificationWorker(
         // Decidir qué notificación enviar según hora del día y contexto
         val (title, body) = when {
             // Protección de racha: prioridad máxima si es >2 días y no se completó hoy
-            !hasCompletedToday && streakDays >= 2 && hour >= 18 -> {
+            // Solo si nagging está habilitado
+            naggingEnabled && !hasCompletedToday && streakDays >= 2 && hour >= 18 -> {
                 "🔥 ¡Tu racha está en peligro!" to streakMessages(streakDays).random()
             }
             // Mañana: 8-10 AM
@@ -261,45 +273,4 @@ class SmartNotificationWorker(
         manager.notify(NOTIFICATION_ID_SMART, notification)
     }
     
-    /**
-     * Cálculo simplificado de racha (sin acceso a StreakCalculator por ser Worker).
-     */
-    private fun calculateSimpleStreak(tasks: List<Task>): Int {
-        val completedTasks = tasks.filter { it.completedAt != null }
-        if (completedTasks.isEmpty()) return 0
-        
-        val daysWithCompletions = completedTasks
-            .mapNotNull { it.completedAt }
-            .map { dayKey(it) }
-            .toSortedSet()
-        
-        val today = dayKey(System.currentTimeMillis())
-        val startDay = if (today in daysWithCompletions) today
-        else {
-            val yesterday = today - 1
-            if (yesterday in daysWithCompletions) yesterday else return 0
-        }
-        
-        var streak = 0
-        var currentDay = startDay
-        while (currentDay in daysWithCompletions) {
-            streak++
-            currentDay--
-        }
-        return streak
-    }
-    
-    private fun dayKey(timestamp: Long): Int {
-        val cal = Calendar.getInstance()
-        cal.timeInMillis = timestamp
-        return cal.get(Calendar.YEAR) * 1000 + cal.get(Calendar.DAY_OF_YEAR)
-    }
-    
-    private fun isToday(timestamp: Long): Boolean {
-        val cal = Calendar.getInstance()
-        val todayYear = cal.get(Calendar.YEAR)
-        val todayDay = cal.get(Calendar.DAY_OF_YEAR)
-        cal.timeInMillis = timestamp
-        return cal.get(Calendar.YEAR) == todayYear && cal.get(Calendar.DAY_OF_YEAR) == todayDay
-    }
 }
