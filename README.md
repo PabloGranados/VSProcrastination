@@ -1,18 +1,46 @@
 # VS Procrastination
 
-**v2.2.1** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.3.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
 
 ## Descargar APK
 
-📲 **[Descargar VS Procrastination v2.2.1](releases/VS-Procrastination-v2.2.1.apk)**
+📲 **[Descargar VS Procrastination v2.3.0](releases/VS-Procrastination-v2.3.0.apk)**
 
 > Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
 
-## Novedades en v2.2.1
+## Novedades en v2.3.0
 
-### 🎨 Corrección de UI — Habit Tracker
+### 🔓 Open Source Ready — Firebase eliminado
+- **Firebase Auth, Firestore y Analytics completamente removidos**: la app ya no depende de servicios de Google vinculados a una cuenta personal
+- **Google Sign-In eliminado**: ya no se requiere `google-services.json` ni credenciales privadas
+- **6 dependencias removidas**: firebase-bom, firebase-firestore, firebase-auth, firebase-analytics, play-services-auth, kotlinx-coroutines-play-services
+- **Plugin google-services eliminado** de Gradle
+- **Permiso INTERNET eliminado**: la app funciona 100% offline
+- **Archivo `google-services.json` eliminado** del repositorio
+
+### 💾 Export/Import JSON — Respaldo y transferencia de datos
+- **Exportar todos los datos** a un archivo JSON legible: tareas, subtareas, hábitos y logs de hábitos
+- **Importar datos** desde un archivo JSON con merge inteligente: agrega datos nuevos sin borrar los existentes
+- **Detección de duplicados**: por nombre + fecha de creación, evita insertar la misma tarea/hábito dos veces
+- **Storage Access Framework (SAF)**: no requiere permisos de almacenamiento — el usuario elige dónde guardar/leer el archivo
+- **Nueva sección "Respaldo" en Ajustes**: botones "Exportar datos" e "Importar datos" con indicador de progreso y mensajes de resultado
+- **Formato portátil**: el JSON exportado incluye versión de esquema, nombre de la app y timestamp de exportación
+- Ideal para hacer backups, transferir datos entre dispositivos o migrar a un nuevo celular
+
+### 🏗️ Arquitectura
+- **ExportImportManager** reemplaza a FirestoreSyncManager como gestor de transferencia de datos
+- **TaskRepository simplificado**: eliminadas todas las llamadas a syncManager (push, delete remote)
+- **MainViewModel**: auth/sync Firebase reemplazado por `exportData(uri)` / `importData(uri)`
+- **MainUiState**: campos `isSignedIn`, `userEmail`, `userName`, `isSyncing` reemplazados por `isExportImportInProgress`, `exportImportMessage`
+- **TaskDao**: eliminados `getTaskByFirebaseId()` y `updateFirebaseId()` (queries solo para Firebase)
+- **HabitDao**: nuevas queries `getAllHabitsSync()` y `getAllLogsSync()` para exportación
+- Campos `firebaseId` mantenidos como legacy en entidades Room para compatibilidad con esquema v5 (no se puede hacer DROP COLUMN en SQLite sin migración destructiva)
+
+## Novedades anteriores
+
+### 🎨 Corrección de UI — Habit Tracker (v2.2.1)
 - **Selector de emojis adaptativo**: grid de 8 columnas fijas reemplazado por layout responsivo — 4 columnas en teléfonos (portrait) y 8 en tablets. Usa `weight(1f)` + `aspectRatio(1f)` para distribución equitativa sin desbordamiento
 - **Emojis ya no se amontonan**: el grid anterior (8×40dp = 348dp) desbordaba el `AlertDialog` en pantallas < 360dp — ahora se adapta a cualquier ancho
 - **Fondo visual en emojis**: todos los emojis del selector tienen fondo `surfaceVariant` sutil, haciéndolos visibles como botones tapeables (antes sólo el seleccionado tenía fondo)
@@ -21,7 +49,7 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 - **Animación de completado arreglada**: la escala al marcar un hábito era un no-op (`1f → 1f`), ahora hay feedback visual sutil (`1f → 1.02f`)
 - Bordes redondeados de 12dp en los emojis del selector para mejor apariencia
 
-### 🔔 Notificaciones — Menos spam + horas de silencio
+### 🔔 Notificaciones — Menos spam + horas de silencio (v2.2.1)
 - **Eliminado worker redundante**: `TaskReminderWorker` periódico (cada 2h) ya no se programa — duplicaba lo que SmartNotificationWorker ya hace mejor
 - **Al abrir la app se cancela** el worker periódico viejo activamente con `cancelPeriodicReminder()` 
 - **SmartNotificationWorker de cada 1h a cada 3h**: ~5 notificaciones útiles/día en lugar de ~14
@@ -29,7 +57,7 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 - **Horas de silencio**: TaskReminderWorker y SmartNotificationWorker callan de 22:00 a 7:59; DeadlineCountdownWorker de 23:00 a 6:59
 - Justificación: las notificaciones nocturnas interrumpen el sueño y generan asociación negativa con la app (Exelmans & Van den Bulck, 2016)
 
-## Novedades en v2.2.0
+### 🔄 Habit Tracker (v2.2.0)
 
 ### 🔄 Habit Tracker — Seguimiento de hábitos diarios
 - **Nueva pantalla de hábitos**: accesible desde el botón 🔄 en la pantalla principal
@@ -49,7 +77,6 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 - **Migración Room v4→v5**: tablas `habits` y `habit_logs` con índices optimizados y foreign key CASCADE
 - **HabitViewModel** independiente del MainViewModel — cada pantalla gestiona su propio estado
 - **HabitRepository** con toggle atómico de completación diaria y cálculo de rachas
-- Campos `firebaseId` preparados para sincronización futura
 
 ## Novedades anteriores
 
@@ -58,14 +85,14 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 - **Las preferencias de notificación ahora funcionan**: los toggles de "nagging" y "recordatorios de deadline" en Ajustes realmente desactivan las notificaciones (antes eran cosméticos)
 - **Notificaciones consistentes**: corregido bug donde la notificación compacta y expandida mostraban mensajes diferentes
 - **Colisión de notificaciones resuelta**: `AppLeaveDetector` y `DeadlineCountdownWorker` ya no comparten el mismo ID de notificación
-- **Limpieza de tareas completadas sincroniza con Firebase**: al borrar tareas completadas, ahora también se eliminan de Firestore
+- **Limpieza de tareas completadas funciona correctamente**
 - **Versión dinámica**: la pantalla de Ajustes muestra la versión real desde `BuildConfig` en lugar de un texto fijo
 
 ### 🛡️ Seguridad y estabilidad (v2.1.3)
 - **TaskConverters a prueba de crashes**: valores corruptos en la BD ya no causan crash — devuelven defaults seguros
 - **Logs condicionales**: `Log.w()` solo se ejecuta en builds de debug, no en release
 - **ProGuard configurado**: reglas para Room, Firebase, Coroutines, DataStore y enums
-- **Sincronización thread-safe**: añadido Mutex para evitar sync concurrentes en Firestore
+- **Sincronización thread-safe**: añadido Mutex para evitar operaciones concurrentes
 - **Room Schema Export habilitado**: permite verificar integridad de migraciones futuras
 
 ### 🔧 Mejoras de código (v2.1.3)
@@ -104,13 +131,12 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 - Cada notificación incluye **datos científicos reales** (Pychyl, Steel, Baumeister, Gollwitzer, Kahneman)
 - Los recordatorios periódicos ahora muestran **el nombre exacto de tu tarea prioritaria** en vez de texto genérico
 
-### 🔄 Sincronización entre dispositivos (v2.0)
-- **Tus tareas en todos tus dispositivos**: celular, tablet, cualquier Android
-- Inicia sesión con Google y tus tareas se sincronizan automáticamente
-- Sincronización al abrir la app y al hacer cambios (crear, editar, completar, eliminar)
-- Botón "Sincronizar ahora" en Ajustes para forzar sincronización manual
-- Resolución de conflictos automática (gana la versión más reciente)
-- Funciona offline: si no hay internet, los datos se guardan localmente y se sincronizan después
+### � Respaldo y transferencia (v2.3.0, reemplaza Sincronización v2.0)
+- **Export/Import JSON** reemplaza la sincronización con Firebase
+- Exporta e importa tareas, subtareas, hábitos y logs
+- Merge inteligente: no borra datos existentes al importar
+- Detección de duplicados por nombre + fecha de creación
+- Sin necesidad de cuenta de Google ni conexión a internet
 
 ## Cómo funciona
 
@@ -174,7 +200,7 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 ### Notificaciones inteligentes
 
 - **Sistema circadiano**: notificaciones adaptadas a la hora del día (mañana, mediodía, tarde, noche) con contenido científico específico
-- Recordatorio periódico cada 2 horas con **el nombre real de tu tarea prioritaria** (ya no dice genérico)
+- Recordatorio periódico cada 3 horas con **el nombre real de tu tarea prioritaria** (ya no dice genérico)
 - Notificaciones persistentes (no se descartan con swipe)
 - Modo nagging cada 15 minutos para tareas vencidas, con mensajes directos y rotantes
 - Recordatorio 1 hora antes del deadline
@@ -197,7 +223,7 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 - Duración del Pomodoro ajustable
 - Toggle de notificaciones nagging y recordatorios de deadline
 - Tema: claro, oscuro o automático del sistema
-- Sincronización con Google (nuevo en v2.0)
+- Export/Import JSON para respaldo y transferencia entre dispositivos
 - Limpiar tareas completadas
 
 ### Habit Tracker
@@ -224,8 +250,7 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 
 - Kotlin 2.0 + Jetpack Compose con Material Design 3
 - Room 2.6 con migraciones (v1 → v2 → v3 → v4 → v5)
-- Firebase Auth + Firestore para sincronización entre dispositivos
-- Google Sign-In para autenticación
+- Export/Import JSON para respaldo y transferencia de datos (Storage Access Framework)
 - WorkManager 2.9 para notificaciones programadas y workers periódicos
 - Foreground Service con cronómetro nativo para el timer
 - Navigation Compose 2.8 para navegación entre pantallas
@@ -257,7 +282,7 @@ app/src/main/java/com/example/vsprocrastination/
 │   │   ├── TaskRepository.kt    # Capa de abstracción sobre DAOs
 │   │   └── HabitRepository.kt   # Lógica de hábitos: toggle, rachas, CRUD
 │   └── sync/
-│       └── FirestoreSyncManager.kt # Sincronización Room ↔ Firestore
+│       └── ExportImportManager.kt # Export/Import JSON via SAF
 ├── domain/
 │   ├── PriorityCalculator.kt    # Algoritmo de priorización + stats
 │   ├── StreakCalculator.kt      # Cálculo de rachas consecutivas
@@ -299,9 +324,22 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 - `VIBRATE` — notificaciones nagging y countdown
 - `RECEIVE_BOOT_COMPLETED` — reprogramar workers tras reinicio
 - `WAKE_LOCK` — WorkManager interno
-- `INTERNET` — sincronización con Firebase
-
 ## Changelog
+
+### v2.3.0 (febrero 2026)
+- **Firebase completamente eliminado**: Auth, Firestore, Analytics y Google Sign-In removidos
+- **Nuevo sistema Export/Import JSON**: respaldo y transferencia de datos sin cuenta de Google
+- Plugin google-services y 6 dependencias removidas
+- Permiso INTERNET eliminado (app 100% offline)
+- ExportImportManager reemplaza FirestoreSyncManager
+- TaskRepository simplificado (sin llamadas a syncManager)
+- MainViewModel: auth/sync → export/import
+- SettingsScreen: sección "Sincronización" → "Respaldo"
+- MainActivity: signInLauncher → exportLauncher/importLauncher (SAF)
+- HabitDao: nuevas queries sincrónicas para exportación
+- TaskDao: eliminados getTaskByFirebaseId() y updateFirebaseId()
+- Archivo google-services.json eliminado del repositorio
+- Campos firebaseId mantenidos como legacy para compatibilidad Room v5
 
 ### v2.2.1 (febrero 2026)
 - Selector de emojis adaptativo: 4 columnas en portrait, 8 en tablets (weight + aspectRatio)
@@ -338,13 +376,13 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 - Workers respetan preferencias de notificación del usuario (nagging/deadline)
 - Corregido doble random() en notificaciones nagging y AppLeaveDetector
 - Resuelto colisión de Notification IDs entre AppLeaveDetector y DeadlineCountdownWorker
-- clearCompletedTasks ahora elimina también las tareas remotas en Firestore
+- clearCompletedTasks simplificado
 - Versión en Ajustes usa BuildConfig.VERSION_NAME dinámicamente
 - TaskConverters con manejo seguro de valores inválidos (no crashea)
 - Eliminado código duplicado en SmartNotificationWorker (usa StreakCalculator)
 - Sincronización protegida con Mutex contra ejecuciones concurrentes
 - Logs condicionales: Log.w solo en BuildConfig.DEBUG
-- ProGuard configurado para Room, Firebase, Coroutines, DataStore y enums
+- ProGuard configurado para Room, Coroutines, DataStore y enums
 - Room exportSchema habilitado con directorio de schemas
 - buildConfig = true habilitado para acceso a BuildConfig.VERSION_NAME
 - Botón "CONTINUAR" sin minutos hardcodeados
@@ -370,8 +408,8 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 - Reemplazada barra de progreso genérica por el mapa de calor en pantalla principal
 
 ### v2.0 (febrero 2026)
-- Sincronización entre dispositivos con Firebase (Auth + Firestore)
-- Google Sign-In para vincular cuenta
+- Sincronización entre dispositivos con Firebase (removido en v2.3.0)
+- Google Sign-In para vincular cuenta (removido en v2.3.0)
 - Sync automático al abrir la app y al modificar tareas
 - Sync manual desde Ajustes
 - Migración de base de datos v3 → v4
@@ -396,7 +434,7 @@ Para generar el APK de release:
 El APK se genera en `app/build/outputs/apk/release/`. Cópialo a la carpeta `releases/` y renómbralo:
 
 ```bash
-cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.2.0.apk
+cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.3.0.apk
 ```
 
 Para el APK de debug (con firma automática):

@@ -45,6 +45,6 @@ data class HabitLog(
     /** Timestamp exacto de completación (para analytics futuros) */
     val completedAt: Long = System.currentTimeMillis(),
     
-    /** Firebase sync field */
+    /** Campo legacy (esquema Room v5) */
     val firebaseId: String? = null
 )

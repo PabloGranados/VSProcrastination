@@ -74,7 +74,7 @@ abstract class AppDatabase : RoomDatabase() {
         }
         
         /**
-         * Migración v3→v4: Agrega campos de sincronización Firebase.
+         * Migración v3→v4: Agrega campos legacy de sincronización (firebaseId, lastModifiedAt).
          */
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {

@@ -33,15 +33,12 @@ fun SettingsScreen(
     preferencesManager: PreferencesManager,
     onBack: () -> Unit,
     onClearCompleted: () -> Unit,
-    // Sincronización entre dispositivos
-    isSignedIn: Boolean = false,
-    userEmail: String? = null,
-    userName: String? = null,
-    isSyncing: Boolean = false,
-    lastSyncMessage: String? = null,
-    onSignInClick: () -> Unit = {},
-    onSignOutClick: () -> Unit = {},
-    onSyncClick: () -> Unit = {}
+    // Export/Import de datos
+    isExportImportInProgress: Boolean = false,
+    exportImportMessage: String? = null,
+    onExportClick: () -> Unit = {},
+    onImportClick: () -> Unit = {},
+    onDismissExportImportMessage: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     
@@ -178,98 +175,77 @@ fun SettingsScreen(
                 }
             }
             
-            // === SINCRONIZACIÓN ENTRE DISPOSITIVOS ===
-            SettingsSection(title = "🔄 Sincronización") {
-                if (isSignedIn) {
-                    // Usuario autenticado
+            // === RESPALDO Y TRANSFERENCIA ===
+            SettingsSection(title = "💾 Respaldo") {
+                Text(
+                    text = "Exporta tus datos a un archivo JSON para hacer respaldo o transferir a otro dispositivo.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Button(
+                    onClick = onExportClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isExportImportInProgress
+                ) {
+                    if (isExportImportInProgress) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Procesando...")
+                    } else {
+                        Text("📤 Exportar datos")
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                OutlinedButton(
+                    onClick = onImportClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isExportImportInProgress
+                ) {
+                    Text("📥 Importar datos")
+                }
+                
+                if (exportImportMessage != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            containerColor = if (exportImportMessage.startsWith("✅"))
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            else
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
+                            modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = userName ?: "Usuario",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = userEmail ?: "",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            TextButton(onClick = onSignOutClick) {
-                                Text("Cerrar sesión", color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Button(
-                        onClick = onSyncClick,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isSyncing
-                    ) {
-                        if (isSyncing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
+                            Text(
+                                text = exportImportMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Sincronizando...")
-                        } else {
-                            Text("🔄 Sincronizar ahora")
+                            TextButton(onClick = onDismissExportImportMessage) {
+                                Text("OK")
+                            }
                         }
                     }
-                    
-                    if (lastSyncMessage != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = lastSyncMessage,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "💡 Tus tareas se sincronizan automáticamente al abrir la app y al hacer cambios.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    // No autenticado
-                    Text(
-                        text = "Sincroniza tus tareas entre tu celular, tablet y cualquier dispositivo Android.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Button(
-                        onClick = onSignInClick,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("🔗 Iniciar sesión con Google")
-                    }
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "💡 Inicia sesión con la misma cuenta de Google en todos tus dispositivos.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "💡 Al importar, los datos nuevos se agregan sin borrar los existentes. Los duplicados se ignoran.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             
             // === DATOS ===

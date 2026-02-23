@@ -66,7 +66,7 @@ data class Task(
     // Tiempo trabajado en la tarea (para Pomodoro)
     val totalTimeWorkedMillis: Long = 0,
     
-    // Firebase sync fields (v4)
+    // Campo legacy (se mantiene por compatibilidad con esquema Room v4)
     val firebaseId: String? = null,
     val lastModifiedAt: Long = System.currentTimeMillis()
 ) {

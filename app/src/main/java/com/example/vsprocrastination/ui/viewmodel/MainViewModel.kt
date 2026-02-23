@@ -3,10 +3,9 @@ package com.example.vsprocrastination.ui.viewmodel
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
-import android.content.Intent
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.vsprocrastination.R
 import com.example.vsprocrastination.data.database.AppDatabase
 import com.example.vsprocrastination.data.model.Difficulty
 import com.example.vsprocrastination.data.model.Priority
@@ -15,7 +14,7 @@ import com.example.vsprocrastination.data.model.Task
 import com.example.vsprocrastination.data.preferences.PreferencesManager
 import com.example.vsprocrastination.data.repository.HabitRepository
 import com.example.vsprocrastination.data.repository.TaskRepository
-import com.example.vsprocrastination.data.sync.FirestoreSyncManager
+import com.example.vsprocrastination.data.sync.ExportImportManager
 import com.example.vsprocrastination.domain.MotivationalPhrases
 import com.example.vsprocrastination.domain.PriorityCalculator
 import com.example.vsprocrastination.domain.StreakCalculator
@@ -26,15 +25,8 @@ import com.example.vsprocrastination.service.FocusService
 import com.example.vsprocrastination.service.SmartNotificationWorker
 import com.example.vsprocrastination.service.TaskReminderWorker
 import com.example.vsprocrastination.service.TimerState
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 /**
  * Estado de la UI principal.
@@ -61,12 +53,9 @@ data class MainUiState(
     val motivationalPhrase: String = "",
     val suggestedTaskSubtasks: List<Subtask> = emptyList(),
     val pomodoroDuration: Int = 25,
-    // Sincronización entre dispositivos
-    val isSignedIn: Boolean = false,
-    val userEmail: String? = null,
-    val userName: String? = null,
-    val isSyncing: Boolean = false,
-    val lastSyncMessage: String? = null,
+    // Export/Import de datos
+    val isExportImportInProgress: Boolean = false,
+    val exportImportMessage: String? = null,
     // Hábitos (para mapa de calor)
     val habitCompletionsByDay: Map<String, List<String>> = emptyMap()
 )
@@ -78,9 +67,9 @@ data class MainUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     private val database = AppDatabase.getDatabase(application)
-    private val syncManager = FirestoreSyncManager(database.taskDao(), database.subtaskDao())
-    private val repository = TaskRepository(database.taskDao(), database.subtaskDao(), syncManager)
+    private val repository = TaskRepository(database.taskDao(), database.subtaskDao())
     private val habitRepository = HabitRepository(database.habitDao())
+    private val exportImportManager = ExportImportManager(database.taskDao(), database.subtaskDao(), database.habitDao())
     val preferencesManager = PreferencesManager(application)
     private val context: Context get() = getApplication()
     
@@ -96,8 +85,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         observeFocusService()
         observePreferences()
         initializeNotifications()
-        updateAuthState()
-        autoSyncOnStart()
     }
     
     /**
@@ -539,144 +526,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return repository.getSubtasksForTaskSync(taskId)
     }
     
-    // === Sincronización entre dispositivos ===
+    // === Export/Import de datos ===
     
     /**
-     * Crea el cliente de Google Sign-In.
-     * El web client ID se autogenera del google-services.json.
+     * Exporta todos los datos a un archivo JSON.
+     * @param uri URI del archivo destino (obtenido via SAF ACTION_CREATE_DOCUMENT)
      */
-    fun getGoogleSignInClient(): GoogleSignInClient {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(context.getString(R.string.default_web_client_id))
-            .requestEmail()
-            .build()
-        return GoogleSignIn.getClient(context, gso)
-    }
-    
-    /**
-     * Procesa el resultado del intent de Google Sign-In.
-     * Autentica con Firebase y lanza la primera sincronización.
-     */
-    fun handleSignInResult(data: Intent?) {
-        if (data == null) {
-            _uiState.update {
-                it.copy(lastSyncMessage = "❌ Inicio de sesión cancelado")
-            }
-            return
-        }
-        
+    fun exportData(uri: Uri) {
         viewModelScope.launch {
-            try {
-                _uiState.update { it.copy(isSyncing = true) }
-                
-                val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-                val account = task.getResult(ApiException::class.java)
-                
-                val idToken = account.idToken
-                if (idToken == null) {
-                    _uiState.update {
-                        it.copy(
-                            isSyncing = false,
-                            lastSyncMessage = "❌ No se obtuvo token. ¿Habilitaste Google en Firebase Console → Authentication?"
-                        )
-                    }
-                    return@launch
-                }
-                
-                val credential = GoogleAuthProvider.getCredential(idToken, null)
-                FirebaseAuth.getInstance().signInWithCredential(credential).await()
-                
-                updateAuthState()
-                
-                // Primera sincronización completa
-                val result = syncManager.syncAll()
-                preferencesManager.setSyncEnabled(true)
-                preferencesManager.setLastSyncTimestamp()
-                
-                _uiState.update {
-                    it.copy(
-                        isSyncing = false,
-                        lastSyncMessage = result.message
-                    )
-                }
-            } catch (e: ApiException) {
-                _uiState.update {
-                    it.copy(
-                        isSyncing = false,
-                        lastSyncMessage = "❌ Google Sign-In falló (code: ${e.statusCode}). Verifica google-services.json"
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isSyncing = false,
-                        lastSyncMessage = "❌ Error: ${e.localizedMessage}"
-                    )
-                }
-            }
-        }
-    }
-    
-    /**
-     * Cierra sesión de Google y Firebase.
-     */
-    fun signOut() {
-        FirebaseAuth.getInstance().signOut()
-        getGoogleSignInClient().signOut()
-        viewModelScope.launch {
-            preferencesManager.setSyncEnabled(false)
-        }
-        updateAuthState()
-        _uiState.update { it.copy(lastSyncMessage = null) }
-    }
-    
-    /**
-     * Sincronización manual (botón).
-     */
-    fun syncTasks() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true) }
-            val result = syncManager.syncAll()
-            if (result.success) {
-                preferencesManager.setLastSyncTimestamp()
-            }
+            _uiState.update { it.copy(isExportImportInProgress = true) }
+            val result = exportImportManager.exportToJson(context, uri)
             _uiState.update {
                 it.copy(
-                    isSyncing = false,
-                    lastSyncMessage = result.message
+                    isExportImportInProgress = false,
+                    exportImportMessage = result.message
                 )
             }
         }
     }
     
     /**
-     * Actualiza el estado de autenticación en la UI.
+     * Importa datos desde un archivo JSON.
+     * Hace merge: no borra datos existentes, solo agrega nuevos.
+     * @param uri URI del archivo origen (obtenido via SAF ACTION_OPEN_DOCUMENT)
      */
-    private fun updateAuthState() {
-        _uiState.update {
-            it.copy(
-                isSignedIn = syncManager.isSignedIn(),
-                userEmail = syncManager.getCurrentUserEmail(),
-                userName = syncManager.getCurrentUserName()
-            )
+    fun importData(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isExportImportInProgress = true) }
+            val result = exportImportManager.importFromJson(context, uri)
+            _uiState.update {
+                it.copy(
+                    isExportImportInProgress = false,
+                    exportImportMessage = result.message
+                )
+            }
         }
     }
     
     /**
-     * Auto-sync al abrir la app si está autenticado.
+     * Limpia el mensaje de export/import.
      */
-    private fun autoSyncOnStart() {
-        if (syncManager.isSignedIn()) {
-            viewModelScope.launch {
-                try {
-                    syncManager.syncAll()
-                    preferencesManager.setLastSyncTimestamp()
-                } catch (e: Exception) {
-                    if (com.example.vsprocrastination.BuildConfig.DEBUG) {
-                        android.util.Log.w("MainViewModel", "Auto-sync failed", e)
-                    }
-                }
-            }
-        }
+    fun dismissExportImportMessage() {
+        _uiState.update { it.copy(exportImportMessage = null) }
     }
 }

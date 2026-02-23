@@ -41,7 +41,7 @@ data class Habit(
     /** Hábito archivado (soft delete) — preserva historial sin mostrarlo activo */
     val isArchived: Boolean = false,
     
-    /** Firebase sync fields (preparado para sincronización futura) */
+    /** Campos legacy (se mantienen por compatibilidad con esquema Room v5) */
     val firebaseId: String? = null,
     val lastModifiedAt: Long = System.currentTimeMillis()
 )

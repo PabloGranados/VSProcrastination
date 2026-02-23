@@ -37,6 +37,6 @@ data class Subtask(
     val name: String,
     val isCompleted: Boolean = false,
     val sortOrder: Int = 0,
-    // Firebase sync field (v4)
+    // Campo legacy (esquema Room v4)
     val firebaseId: String? = null
 )

@@ -89,6 +89,16 @@ interface HabitDao {
      */
     @Query("SELECT DISTINCT dateEpochDay FROM habit_logs ORDER BY dateEpochDay ASC")
     suspend fun getAllCompletionDays(): List<Int>
+
+    // === Queries sincrónicas para Export/Import ===
+
+    /** Obtiene todos los hábitos de forma sincrónica (para exportación). */
+    @Query("SELECT * FROM habits ORDER BY createdAt ASC")
+    suspend fun getAllHabitsSync(): List<Habit>
+
+    /** Obtiene todos los logs de forma sincrónica (para exportación). */
+    @Query("SELECT * FROM habit_logs ORDER BY dateEpochDay ASC")
+    suspend fun getAllLogsSync(): List<HabitLog>
 }
 
 /**

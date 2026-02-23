@@ -57,27 +57,33 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable("settings") {
-                        // Launcher para Google Sign-In
-                        val signInLauncher = rememberLauncherForActivityResult(
-                            contract = ActivityResultContracts.StartActivityForResult()
-                        ) { result ->
-                            viewModel.handleSignInResult(result.data)
+                        // Launcher para exportar datos (SAF - crear archivo)
+                        val exportLauncher = rememberLauncherForActivityResult(
+                            contract = ActivityResultContracts.CreateDocument("application/json")
+                        ) { uri ->
+                            uri?.let { viewModel.exportData(it) }
+                        }
+                        
+                        // Launcher para importar datos (SAF - abrir archivo)
+                        val importLauncher = rememberLauncherForActivityResult(
+                            contract = ActivityResultContracts.OpenDocument()
+                        ) { uri ->
+                            uri?.let { viewModel.importData(it) }
                         }
                         
                         SettingsScreen(
                             preferencesManager = viewModel.preferencesManager,
                             onBack = { navController.popBackStack() },
                             onClearCompleted = { viewModel.clearCompletedTasks() },
-                            isSignedIn = uiState.isSignedIn,
-                            userEmail = uiState.userEmail,
-                            userName = uiState.userName,
-                            isSyncing = uiState.isSyncing,
-                            lastSyncMessage = uiState.lastSyncMessage,
-                            onSignInClick = {
-                                signInLauncher.launch(viewModel.getGoogleSignInClient().signInIntent)
+                            isExportImportInProgress = uiState.isExportImportInProgress,
+                            exportImportMessage = uiState.exportImportMessage,
+                            onExportClick = {
+                                exportLauncher.launch("vs_procrastination_backup.json")
                             },
-                            onSignOutClick = { viewModel.signOut() },
-                            onSyncClick = { viewModel.syncTasks() }
+                            onImportClick = {
+                                importLauncher.launch(arrayOf("application/json", "*/*"))
+                            },
+                            onDismissExportImportMessage = { viewModel.dismissExportImportMessage() }
                         )
                     }
                     composable("weekly_summary") {
