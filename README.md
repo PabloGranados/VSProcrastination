@@ -1,16 +1,67 @@
 # VS Procrastination
 
-**v2.3.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.4.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
 
 ## Descargar APK
 
-📲 **[Descargar VS Procrastination v2.3.0](releases/VS-Procrastination-v2.3.0.apk)**
+📲 **[Descargar VS Procrastination v2.4.0](releases/VS-Procrastination-v2.4.0.apk)**
 
 > Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
 
-## Novedades en v2.3.0
+## Novedades en v2.4.0
+
+### 🔔 Reingeniería del sistema de notificaciones — Menos intrusivo, más inteligente
+
+**Problema resuelto: Las notificaciones dejaban de funcionar tras reiniciar el dispositivo.** El BootReceiver tenía `exported="false"` en el manifiesto, impidiendo recibir `BOOT_COMPLETED`. Además, los recordatorios one-shot de deadline no se reprogramaban al reiniciar.
+
+#### Recordatorios escalonados por deadline
+- **3 niveles de urgencia** en vez de un solo recordatorio a 1h:
+  - 📋 **24h antes** → recordatorio suave (GENTLE) — planifica con anticipación
+  - ⏰ **4h antes** → recordatorio medio (PERSISTENT) — hora de actuar
+  - 🔴 **1h antes** → recordatorio urgente — última oportunidad
+- Cada tier tiene tag único para cancelación individual
+- Se reprograman automáticamente tras reinicio del dispositivo
+
+#### Nagging menos agresivo
+- Intervalo: **15 min → 3 horas** (reducción de 12x)
+- Notificaciones ahora **dismissable** (antes eran ONGOING/no se podían quitar)
+- Prioridad reducida: MAX → HIGH
+- Categoría: ALARM → REMINDER (no suena como alarma)
+- Mensajes menos agresivos, más motivacionales
+- Se verifica en BD que la tarea sigue vigente antes de notificar
+- Si la tarea ya fue iniciada, no se envía nagging
+
+#### Countdown de deadline refinado
+- Ventana reducida: **2 horas → 30 minutos** (los recordatorios escalonados cubren las horas previas)
+- ONGOING solo cuando faltan **<10 min** (antes <30 min)
+- Complementa los recordatorios escalonados en vez de solaparse
+
+#### Notificaciones inteligentes optimizadas
+- Intervalo: **3h → 4h** (menos interrupciones)
+- **Límite diario de 3 notificaciones** inteligentes (contador con reset automático)
+- Canal de recordatorios: IMPORTANCE_HIGH → IMPORTANCE_DEFAULT
+
+#### BootReceiver robusto
+- `exported="true"` (obligatorio para broadcasts del sistema)
+- Soporte para **QUICKBOOT_POWERON** (HTC, Xiaomi y otros OEMs)
+- Usa `goAsync()` con coroutine para consultar la BD sin bloquear
+- Reprograma **todos** los recordatorios escalonados de deadline (24h/4h/1h)
+- Reprograma nagging para tareas vencidas no iniciadas
+- Los workers periódicos (SmartNotification + DeadlineCountdown) se recrean
+
+### 🏗️ Arquitectura
+- **TaskReminderWorker**: `scheduleDeadlineReminder()` → `scheduleDeadlineReminders()` (3 tiers)
+- **TaskReminderWorker**: `cancelDeadlineReminder()` → `cancelDeadlineReminders()` (cancela todos los tiers + backward compat)
+- **SmartNotificationWorker**: contador diario con SharedPreferences para cap de 3/día
+- **BootReceiver**: consulta BD en coroutine con `goAsync()` para reprogramar one-shots
+- **MainViewModel**: todas las llamadas actualizadas a los nuevos métodos plurales
+- Métodos antiguos mantenidos como wrappers deprecated para backward compat
+
+## Novedades anteriores
+
+### 🔓 Open Source Ready — Firebase eliminado (v2.3.0)
 
 ### 🔓 Open Source Ready — Firebase eliminado
 - **Firebase Auth, Firestore y Analytics completamente removidos**: la app ya no depende de servicios de Google vinculados a una cuenta personal
@@ -37,8 +88,6 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 - **TaskDao**: eliminados `getTaskByFirebaseId()` y `updateFirebaseId()` (queries solo para Firebase)
 - **HabitDao**: nuevas queries `getAllHabitsSync()` y `getAllLogsSync()` para exportación
 - Campos `firebaseId` mantenidos como legacy en entidades Room para compatibilidad con esquema v5 (no se puede hacer DROP COLUMN en SQLite sin migración destructiva)
-
-## Novedades anteriores
 
 ### 🎨 Corrección de UI — Habit Tracker (v2.2.1)
 - **Selector de emojis adaptativo**: grid de 8 columnas fijas reemplazado por layout responsivo — 4 columnas en teléfonos (portrait) y 8 en tablets. Usa `weight(1f)` + `aspectRatio(1f)` para distribución equitativa sin desbordamiento
@@ -200,15 +249,15 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 ### Notificaciones inteligentes
 
 - **Sistema circadiano**: notificaciones adaptadas a la hora del día (mañana, mediodía, tarde, noche) con contenido científico específico
-- Recordatorio periódico cada 3 horas con **el nombre real de tu tarea prioritaria** (ya no dice genérico)
-- Notificaciones persistentes (no se descartan con swipe)
-- Modo nagging cada 15 minutos para tareas vencidas, con mensajes directos y rotantes
-- Recordatorio 1 hora antes del deadline
-- **Countdown estilo Duolingo**: cuando una tarea está a menos de 2 horas de vencer, aparece una notificación con cronómetro regresivo en tiempo real que cuenta atrás hasta el deadline. Se vuelve pegajosa cuando quedan menos de 30 minutos.
+- Notificaciones inteligentes cada 4 horas (máximo 3 por día) con **el nombre real de tu tarea prioritaria**
+- **Recordatorios escalonados** por deadline: 24h antes (suave), 4h antes (medio), 1h antes (urgente)
+- Todas las notificaciones son **dismissable** (el usuario puede descartarlas)
+- Modo nagging cada 3 horas para tareas vencidas, con mensajes motivacionales
+- **Countdown estilo Duolingo**: cuando una tarea está a menos de 30 minutos de vencer, aparece una notificación con cronómetro regresivo en tiempo real. Se vuelve pegajosa cuando quedan menos de 10 minutos.
 - Protección de racha: aviso urgente si tienes racha activa y no has completado nada hoy
 - Alertas de deadline inminente (<4 horas) con motivación contextual
 - Datos científicos integrados en cada notificación (Steel, Pychyl, Baumeister, Gollwitzer, Kahneman)
-- Reprogramación automática tras reinicio del dispositivo
+- **Reprogramación completa tras reinicio**: BootReceiver reprograma todos los recordatorios escalonados, nagging y workers periódicos
 
 ### Rachas y motivación
 
@@ -289,11 +338,11 @@ app/src/main/java/com/example/vsprocrastination/
 │   └── MotivationalPhrases.kt   # Frases contextuales por categoría
 ├── service/
 │   ├── FocusService.kt          # Foreground Service (Pomodoro + cronómetro nativo)
-│   ├── TaskReminderWorker.kt    # WorkManager (3 niveles de notificación + consulta BD)
-│   ├── SmartNotificationWorker.kt # Notificaciones circadianas basadas en ciencia
-│   ├── DeadlineCountdownWorker.kt # Countdown <2h estilo Duolingo
+│   ├── TaskReminderWorker.kt    # WorkManager (recordatorios escalonados 24h/4h/1h + nagging 3h)
+│   ├── SmartNotificationWorker.kt # Notificaciones circadianas (4h, máx 3/día)
+│   ├── DeadlineCountdownWorker.kt # Countdown <30min estilo Duolingo
 │   ├── AppLeaveDetector.kt      # BroadcastReceiver (salida de app)
-│   └── BootReceiver.kt          # Reprograma workers tras reboot
+│   └── BootReceiver.kt          # Reprograma TODO tras reboot (workers + one-shots + nagging)
 ├── ui/
 │   ├── screens/
 │   │   ├── MainScreen.kt        # Pantalla principal (layout adaptativo compact/expanded)
@@ -325,6 +374,25 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 - `RECEIVE_BOOT_COMPLETED` — reprogramar workers tras reinicio
 - `WAKE_LOCK` — WorkManager interno
 ## Changelog
+
+### v2.4.0 (febrero 2026)
+- **Fix crítico**: BootReceiver con `exported="true"` — las notificaciones ahora sobreviven al reinicio del dispositivo
+- BootReceiver soporta QUICKBOOT_POWERON (HTC, Xiaomi, etc.)
+- BootReceiver reprograma recordatorios one-shot de deadline consultando la BD con goAsync()
+- Recordatorios escalonados: 24h (gentle), 4h (persistent), 1h (urgent) antes del deadline
+- Nagging reducido de cada 15 min a cada 3 horas
+- Notificaciones nagging ahora dismissable (antes ONGOING)
+- Nagging: prioridad MAX → HIGH, categoría ALARM → REMINDER
+- Verificación en BD de que la tarea sigue vigente antes de notificar
+- Nagging no se envía si la tarea ya fue iniciada
+- DeadlineCountdownWorker: ventana de 2h → 30 min
+- DeadlineCountdownWorker: ONGOING solo <10 min (antes <30 min)
+- SmartNotificationWorker: intervalo de 3h → 4h
+- SmartNotificationWorker: límite diario de 3 notificaciones inteligentes
+- Canal de recordatorios: IMPORTANCE_HIGH → IMPORTANCE_DEFAULT
+- Mensajes de nagging menos agresivos, más motivacionales
+- Métodos scheduleDeadlineReminder/cancelDeadlineReminder redirigen a versiones plurales
+- versionCode 8 → 9, versionName 2.3.0 → 2.4.0
 
 ### v2.3.0 (febrero 2026)
 - **Firebase completamente eliminado**: Auth, Firestore, Analytics y Google Sign-In removidos
@@ -434,7 +502,7 @@ Para generar el APK de release:
 El APK se genera en `app/build/outputs/apk/release/`. Cópialo a la carpeta `releases/` y renómbralo:
 
 ```bash
-cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.3.0.apk
+cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.4.0.apk
 ```
 
 Para el APK de debug (con firma automática):

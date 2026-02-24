@@ -68,13 +68,13 @@ class SmartNotificationWorker(
         
         /**
          * Programa el sistema de notificaciones inteligente.
-         * Ejecuta cada hora y decide qué tipo de notificación enviar
-         * basándose en la hora del día, estado de tareas y contexto.
+         * Ejecuta cada 4 horas (antes 3h) y decide qué tipo de notificación enviar.
+         * Límite: máximo 3 notificaciones inteligentes por día.
          */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<SmartNotificationWorker>(
-                3, TimeUnit.HOURS,
-                30, TimeUnit.MINUTES
+                4, TimeUnit.HOURS,    // Cada 4 horas (antes 3h)
+                1, TimeUnit.HOURS     // Flex interval de 1h
             )
                 .setInputData(workDataOf(
                     KEY_NOTIFICATION_CATEGORY to CATEGORY_SMART_PERIODIC
@@ -176,9 +176,15 @@ class SmartNotificationWorker(
     
     override suspend fun doWork(): Result {
         // ===== HORAS DE SILENCIO (22:00 - 7:59) =====
-        // Las notificaciones "inteligentes" solo tienen sentido en horas de actividad.
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         if (hour >= 22 || hour < 8) {
+            return Result.success()
+        }
+        
+        // ===== LÍMITE DIARIO: MÁX 3 NOTIFICACIONES INTELIGENTES =====
+        // Evita notification fatigue incluso en días donde el worker
+        // se ejecuta más veces de lo esperado.
+        if (hasReachedDailyCap()) {
             return Result.success()
         }
         
@@ -250,8 +256,48 @@ class SmartNotificationWorker(
         }
         
         showSmartNotification(title, body, topTask?.id ?: 0)
+        incrementDailyCounter()
         
         return Result.success()
+    }
+    
+    // ====================================================================
+    // CONTROL DE LÍMITE DIARIO
+    // ====================================================================
+    
+    /**
+     * Verifica si ya se alcanzó el límite de 3 notificaciones inteligentes hoy.
+     * Usa SharedPreferences (no DataStore) por simplicidad en el Worker.
+     */
+    private fun hasReachedDailyCap(): Boolean {
+        val prefs = applicationContext.getSharedPreferences("smart_notif_prefs", Context.MODE_PRIVATE)
+        val todayKey = getTodayKey()
+        val lastDay = prefs.getString("last_notif_day", "") ?: ""
+        val count = prefs.getInt("daily_notif_count", 0)
+        return lastDay == todayKey && count >= 3
+    }
+    
+    /**
+     * Incrementa el contador diario de notificaciones inteligentes.
+     */
+    private fun incrementDailyCounter() {
+        val prefs = applicationContext.getSharedPreferences("smart_notif_prefs", Context.MODE_PRIVATE)
+        val todayKey = getTodayKey()
+        val lastDay = prefs.getString("last_notif_day", "") ?: ""
+        prefs.edit().apply {
+            if (lastDay == todayKey) {
+                putInt("daily_notif_count", prefs.getInt("daily_notif_count", 0) + 1)
+            } else {
+                putString("last_notif_day", todayKey)
+                putInt("daily_notif_count", 1)
+            }
+            apply()
+        }
+    }
+    
+    private fun getTodayKey(): String {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+        return sdf.format(java.util.Date())
     }
     
     private fun showSmartNotification(title: String, body: String, taskId: Long) {
@@ -271,7 +317,7 @@ class SmartNotificationWorker(
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(openIntent)
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT) // Era implícitamente DEFAULT, ahora explícito
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .build()
         

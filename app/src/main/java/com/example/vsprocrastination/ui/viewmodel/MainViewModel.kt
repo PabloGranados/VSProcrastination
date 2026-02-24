@@ -216,7 +216,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
-     * Inicializa canales de notificación y recordatorios periódicos.
+     * Inicializa canales de notificación y sistema de recordatorios.
+     * 
+     * El sistema v2 usa:
+     * - SmartNotificationWorker: notificaciones contextuales cada 4h (máx 3/día)
+     * - DeadlineCountdownWorker: countdown para tareas a <30 min del deadline
+     * - TaskReminderWorker: recordatorios escalonados a 24h/4h/1h del deadline
+     * - Nagging: cada 3h para tareas vencidas (antes 15 min)
      */
     private fun initializeNotifications() {
         TaskReminderWorker.createNotificationChannels(context)
@@ -266,9 +272,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val taskId = repository.createTask(name, deadlineMillis, difficulty, priority, isQuickTask, subtaskNames)
             
-            // Programar recordatorio de deadline si existe
+            // Programar recordatorios escalonados de deadline si existe
             if (deadlineMillis != null) {
-                TaskReminderWorker.scheduleDeadlineReminder(
+                TaskReminderWorker.scheduleDeadlineReminders(
                     context, name, taskId, deadlineMillis
                 )
             }
@@ -289,6 +295,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             
             // Cancelar notificaciones nagging y countdown para esta tarea
             TaskReminderWorker.cancelNaggingReminder(context, task.id)
+            TaskReminderWorker.cancelDeadlineReminders(context, task.id)
             DeadlineCountdownWorker.cancelNotification(context, task.id)
             
             // Limpiar notificación de "vuelve a la app" si existe
@@ -314,7 +321,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             
             // Cancelar notificaciones de esta tarea
             TaskReminderWorker.cancelNaggingReminder(context, task.id)
-            TaskReminderWorker.cancelDeadlineReminder(context, task.id)
+            TaskReminderWorker.cancelDeadlineReminders(context, task.id)
             DeadlineCountdownWorker.cancelNotification(context, task.id)
             
             val notifManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -416,10 +423,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.updateTask(updated)
             repository.updateSubtasks(task.id, subtaskNames)
             
-            // Re-programar deadline reminder si cambió
-            TaskReminderWorker.cancelDeadlineReminder(context, task.id)
+            // Re-programar recordatorios escalonados de deadline si cambió
+            TaskReminderWorker.cancelDeadlineReminders(context, task.id)
             if (deadlineMillis != null) {
-                TaskReminderWorker.scheduleDeadlineReminder(
+                TaskReminderWorker.scheduleDeadlineReminders(
                     context, name, task.id, deadlineMillis
                 )
             }
@@ -463,7 +470,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteTask(task: Task) {
         viewModelScope.launch {
             TaskReminderWorker.cancelNaggingReminder(context, task.id)
-            TaskReminderWorker.cancelDeadlineReminder(context, task.id)
+            TaskReminderWorker.cancelDeadlineReminders(context, task.id)
             DeadlineCountdownWorker.cancelNotification(context, task.id)
             repository.deleteTask(task)
         }

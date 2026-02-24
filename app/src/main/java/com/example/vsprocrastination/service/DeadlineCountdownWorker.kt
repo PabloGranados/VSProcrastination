@@ -21,11 +21,16 @@ import java.util.concurrent.TimeUnit
  * JUSTIFICACIÓN PSICOLÓGICA:
  * "Temporal Motivation Theory" (Steel & König, 2006):
  * La motivación aumenta exponencialmente a medida que el deadline se acerca.
- * Mostrar un countdown visual amplifica este efecto natural. Es el mismo
- * principio que usa Duolingo: presión temporal visible genera acción.
+ * Mostrar un countdown visual amplifica este efecto natural.
  *
- * Se ejecuta cada 15 minutos y busca tareas con deadline en las próximas 2 horas.
- * Muestra notificaciones persistentes con cronómetro regresivo nativo del sistema.
+ * REDISEÑO v2:
+ * - Ventana reducida: 2h → 30 min (complementa los recordatorios escalonados)
+ * - ONGOING solo cuando faltan <10 min (antes siempre <30 min)
+ * - Los recordatorios a 24h/4h/1h los maneja TaskReminderWorker
+ * - Este worker solo se activa para el "último empujón" visual
+ *
+ * Se ejecuta cada 15 minutos y busca tareas con deadline en los próximos 30 min.
+ * Muestra notificaciones con cronómetro regresivo nativo del sistema.
  */
 class DeadlineCountdownWorker(
     context: Context,
@@ -36,11 +41,11 @@ class DeadlineCountdownWorker(
         const val CHANNEL_ID = "deadline_countdown_channel"
         private const val WORK_TAG = "deadline_countdown_scanner"
         private const val NOTIFICATION_BASE_ID = 5000
-        private const val TWO_HOURS_MILLIS = 2 * 60 * 60 * 1000L
+        private const val COUNTDOWN_WINDOW_MILLIS = 30 * 60 * 1000L // 30 min (antes 2h)
         
         /**
          * Programa el scanner periódico cada 15 minutos.
-         * Busca tareas cuyo deadline está a menos de 2 horas.
+         * Busca tareas cuyo deadline está a menos de 30 minutos.
          */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<DeadlineCountdownWorker>(
@@ -83,7 +88,7 @@ class DeadlineCountdownWorker(
                     "Cuenta regresiva de deadlines",
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Alertas cuando una tarea está a menos de 2 horas de vencer"
+                    description = "Cuenta regresiva cuando una tarea está a menos de 30 minutos de vencer"
                     enableVibration(true)
                     vibrationPattern = longArrayOf(0, 300, 200, 300)
                     enableLights(true)
@@ -138,7 +143,7 @@ class DeadlineCountdownWorker(
         val taskDao = db.taskDao()
         
         val now = System.currentTimeMillis()
-        val cutoff = now + TWO_HOURS_MILLIS
+        val cutoff = now + COUNTDOWN_WINDOW_MILLIS
         
         val urgentTasks = taskDao.getTasksWithDeadlineBetween(now, cutoff)
         
@@ -190,8 +195,8 @@ class DeadlineCountdownWorker(
                     .bigText("$timeText\n📌 $taskName\n\n💡 $subtitle")
             )
             .setContentIntent(openIntent)
-            .setOngoing(minutesLeft < 30) // Pegajosa cuando queda poco
-            .setAutoCancel(minutesLeft >= 30)
+            .setOngoing(minutesLeft < 10) // ONGOING solo en los últimos 10 min (antes <30)
+            .setAutoCancel(minutesLeft >= 10)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             // Cronómetro regresivo nativo del sistema

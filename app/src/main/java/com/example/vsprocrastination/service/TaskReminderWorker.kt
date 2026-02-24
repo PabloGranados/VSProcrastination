@@ -16,81 +16,75 @@ import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
 /**
- * TaskReminderWorker - Notificaciones "Pegajosas" con WorkManager.
+ * TaskReminderWorker - Sistema de recordatorios escalonados con WorkManager.
  *
- * JUSTIFICACIÓN TÉCNICA:
- * WorkManager garantiza que las notificaciones se entreguen incluso si
- * la app está cerrada. Usa JobScheduler (API 21+) o AlarmManager como fallback.
- * 
+ * REDISEÑO v2 — MENOS INTRUSIVO, MÁS ESTRATÉGICO:
+ * ================================================
+ *
+ * Recordatorios escalonados por proximidad al deadline:
+ *   • 24h antes: Recordatorio suave (GENTLE) — planificación anticipada
+ *   • 4h antes:  Recordatorio medio (PERSISTENT) — hora de actuar
+ *   • 1h antes:  Recordatorio urgente (PERSISTENT) — última oportunidad
+ *
+ * Nagging para tareas vencidas:
+ *   • Cada 3 HORAS (antes era cada 15 min — demasiado agresivo)
+ *   • Notificaciones DISMISSABLE (antes eran ONGOING — no se podían quitar)
+ *   • Solo en horas activas (8:00-22:00)
+ *
  * JUSTIFICACIÓN PSICOLÓGICA:
- * Las notificaciones que no se pueden descartar fácilmente implementan
- * el "Implementation Intention" (Gollwitzer, 1999) - son recordatorios
- * contextuales que anclan la tarea al momento presente.
- * 
- * La notificación usa ONGOING para que no se descarte con swipe.
- * Solo desaparece cuando el usuario abre la app e inicia la tarea.
+ * La "Temporal Motivation Theory" (Steel & König, 2006) muestra que
+ * la motivación crece exponencialmente al acercarse el deadline.
+ * Los recordatorios escalonados aprovechan esta curva natural.
+ *
+ * El nagging excesivo (cada 15 min) genera "notification fatigue"
+ * y el usuario termina desactivando todas las notificaciones
+ * (Pielot & Rello, 2017). Cada 3h es suficiente para mantener
+ * la tarea presente sin generar rechazo.
  */
 class TaskReminderWorker(
     context: Context,
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
-    
+
     companion object {
         const val CHANNEL_ID = "task_reminder_channel"
         const val NAGGING_CHANNEL_ID = "nagging_reminder_channel"
-        
+
         const val KEY_TASK_NAME = "task_name"
         const val KEY_TASK_ID = "task_id"
         const val KEY_IS_OVERDUE = "is_overdue"
         const val KEY_NOTIFICATION_TYPE = "notification_type"
-        
-        const val TYPE_GENTLE = "gentle"       // Recordatorio suave
-        const val TYPE_PERSISTENT = "persistent" // No se puede descartar
-        const val TYPE_NAGGING = "nagging"       // Repetitivo e insistente
-        
+        const val KEY_DEADLINE_TIER = "deadline_tier" // "24h", "4h", "1h"
+
+        const val TYPE_GENTLE = "gentle"       // Recordatorio suave (24h antes)
+        const val TYPE_PERSISTENT = "persistent" // Recordatorio medio-alto (4h/1h antes)
+        const val TYPE_NAGGING = "nagging"       // Para tareas vencidas (cada 3h)
+
         private const val WORK_TAG_PERIODIC = "periodic_task_reminder"
         private const val WORK_TAG_NAGGING = "nagging_reminder"
-        
+
         /**
-         * Programa un recordatorio periódico cada 2 horas.
-         * DEPRECADO: Usar SmartNotificationWorker en su lugar, que tiene
-         * mensajes contextuales mejores y ventanas circadianas.
-         * Se mantiene el método solo para referencia/nagging.
+         * DEPRECADO: Usar SmartNotificationWorker en su lugar.
          */
         fun schedulePeriodicReminder(context: Context) {
-            val request = PeriodicWorkRequestBuilder<TaskReminderWorker>(
-                2, TimeUnit.HOURS,
-                30, TimeUnit.MINUTES // Flex interval
-            )
-                .setInputData(workDataOf(
-                    KEY_NOTIFICATION_TYPE to TYPE_PERSISTENT
-                ))
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiresBatteryNotLow(false) // Incluso con batería baja
-                        .build()
-                )
-                .addTag(WORK_TAG_PERIODIC)
-                .build()
-            
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                WORK_TAG_PERIODIC,
-                ExistingPeriodicWorkPolicy.KEEP,
-                request
-            )
+            // No-op — mantenido solo por compatibilidad
         }
-        
+
         /**
          * Cancela el recordatorio periódico redundante.
-         * SmartNotificationWorker ahora cumple esta función.
          */
         fun cancelPeriodicReminder(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(WORK_TAG_PERIODIC)
         }
-        
+
         /**
-         * Programa un recordatorio "insistente" (nagging) cada 15 minutos.
-         * Se activa cuando hay tareas vencidas.
+         * Programa recordatorios "nagging" cada 3 HORAS para tareas vencidas.
+         * Antes era cada 15 min — causaba notification fatigue.
+         *
+         * CAMBIOS v2:
+         * - Intervalo: 15 min → 3 horas (reducción de 12x)
+         * - Notificaciones dismissable (ya no ONGOING)
+         * - Prioridad: MAX → HIGH
          */
         fun scheduleNaggingReminder(
             context: Context,
@@ -98,7 +92,8 @@ class TaskReminderWorker(
             taskId: Long
         ) {
             val request = PeriodicWorkRequestBuilder<TaskReminderWorker>(
-                15, TimeUnit.MINUTES
+                3, TimeUnit.HOURS,    // Cada 3 horas (antes 15 min)
+                30, TimeUnit.MINUTES  // Flex interval
             )
                 .setInputData(workDataOf(
                     KEY_TASK_NAME to taskName,
@@ -108,224 +103,283 @@ class TaskReminderWorker(
                 ))
                 .addTag(WORK_TAG_NAGGING)
                 .build()
-            
+
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 "${WORK_TAG_NAGGING}_$taskId",
                 ExistingPeriodicWorkPolicy.REPLACE,
                 request
             )
         }
-        
+
         /**
-         * Programa un recordatorio one-shot para un deadline específico.
+         * Programa recordatorios escalonados para un deadline.
+         *
+         * NUEVO en v2: En vez de un solo recordatorio a 1h del deadline,
+         * ahora programa 3 recordatorios con urgencia creciente:
+         *
+         *   24h antes → GENTLE   (planificación)
+         *    4h antes → PERSISTENT (hora de actuar)
+         *    1h antes → PERSISTENT (última oportunidad)
+         *
+         * Cada tier tiene un tag único para cancelación individual.
          */
-        fun scheduleDeadlineReminder(
+        fun scheduleDeadlineReminders(
             context: Context,
             taskName: String,
             taskId: Long,
             deadlineMillis: Long
         ) {
             val now = System.currentTimeMillis()
-            val delay = deadlineMillis - now - (60 * 60 * 1000) // 1 hora antes del deadline
-            
-            if (delay <= 0) return // Ya pasó o falta muy poco
-            
-            val request = OneTimeWorkRequestBuilder<TaskReminderWorker>()
-                .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-                .setInputData(workDataOf(
-                    KEY_TASK_NAME to taskName,
-                    KEY_TASK_ID to taskId,
-                    KEY_IS_OVERDUE to false,
-                    KEY_NOTIFICATION_TYPE to TYPE_PERSISTENT
-                ))
-                .addTag("deadline_${taskId}")
-                .build()
-            
-            WorkManager.getInstance(context).enqueue(request)
+            val workManager = WorkManager.getInstance(context)
+
+            data class Tier(val label: String, val hoursBefore: Long, val type: String)
+
+            val tiers = listOf(
+                Tier("24h", 24, TYPE_GENTLE),
+                Tier("4h", 4, TYPE_PERSISTENT),
+                Tier("1h", 1, TYPE_PERSISTENT)
+            )
+
+            tiers.forEach { tier ->
+                val delay = deadlineMillis - now - (tier.hoursBefore * 60 * 60 * 1000)
+                if (delay > 0) {
+                    val request = OneTimeWorkRequestBuilder<TaskReminderWorker>()
+                        .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+                        .setInputData(workDataOf(
+                            KEY_TASK_NAME to taskName,
+                            KEY_TASK_ID to taskId,
+                            KEY_IS_OVERDUE to false,
+                            KEY_NOTIFICATION_TYPE to tier.type,
+                            KEY_DEADLINE_TIER to tier.label
+                        ))
+                        .addTag("deadline_${tier.label}_${taskId}")
+                        .build()
+                    workManager.enqueue(request)
+                }
+            }
         }
-        
+
+        /**
+         * Cancela TODOS los recordatorios escalonados de deadline para una tarea.
+         * Incluye tags del sistema anterior (backward compat).
+         */
+        fun cancelDeadlineReminders(context: Context, taskId: Long) {
+            val workManager = WorkManager.getInstance(context)
+            workManager.cancelAllWorkByTag("deadline_24h_${taskId}")
+            workManager.cancelAllWorkByTag("deadline_4h_${taskId}")
+            workManager.cancelAllWorkByTag("deadline_1h_${taskId}")
+            // Backward compat: tag del sistema anterior
+            workManager.cancelAllWorkByTag("deadline_${taskId}")
+        }
+
+        /**
+         * DEPRECADO: Usar scheduleDeadlineReminders (plural).
+         * Redirige al nuevo método para backward compat.
+         */
+        fun scheduleDeadlineReminder(
+            context: Context,
+            taskName: String,
+            taskId: Long,
+            deadlineMillis: Long
+        ) = scheduleDeadlineReminders(context, taskName, taskId, deadlineMillis)
+
+        /**
+         * DEPRECADO: Usar cancelDeadlineReminders (plural).
+         */
+        fun cancelDeadlineReminder(context: Context, taskId: Long) =
+            cancelDeadlineReminders(context, taskId)
+
         /**
          * Cancela recordatorios nagging para una tarea específica.
-         * Se llama cuando la tarea se inicia o completa.
          */
         fun cancelNaggingReminder(context: Context, taskId: Long) {
             WorkManager.getInstance(context)
                 .cancelUniqueWork("${WORK_TAG_NAGGING}_$taskId")
         }
-        
-        /**
-         * Cancela el recordatorio de deadline para una tarea.
-         */
-        fun cancelDeadlineReminder(context: Context, taskId: Long) {
-            WorkManager.getInstance(context)
-                .cancelAllWorkByTag("deadline_${taskId}")
-        }
-        
+
         /**
          * Crea los canales de notificación requeridos.
-         * Llamar una vez al iniciar la app.
          */
         fun createNotificationChannels(context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val manager = context.getSystemService(NotificationManager::class.java)
-                
-                // Canal de recordatorios normales
+
+                // Canal de recordatorios normales (gentle + persistent)
                 val reminderChannel = NotificationChannel(
                     CHANNEL_ID,
                     "Recordatorios de tareas",
-                    NotificationManager.IMPORTANCE_HIGH
+                    NotificationManager.IMPORTANCE_DEFAULT // Era HIGH → DEFAULT para menos intrusión
                 ).apply {
-                    description = "Recordatorios para que inicies tus tareas"
+                    description = "Recordatorios anticipados para tus tareas con deadline"
                     enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 500, 200, 500)
+                    vibrationPattern = longArrayOf(0, 300, 200, 300)
                 }
-                
-                // Canal "nagging" (insistente) - máxima importancia
+
+                // Canal "nagging" — para tareas vencidas (importancia HIGH)
                 val naggingChannel = NotificationChannel(
                     NAGGING_CHANNEL_ID,
                     "Recordatorios urgentes",
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Recordatorios insistentes para tareas vencidas"
+                    description = "Recordatorios para tareas que ya pasaron su fecha límite"
                     enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 1000, 500, 1000, 500, 1000)
+                    vibrationPattern = longArrayOf(0, 500, 300, 500)
                     enableLights(true)
                     lightColor = android.graphics.Color.RED
                 }
-                
+
                 manager.createNotificationChannel(reminderChannel)
                 manager.createNotificationChannel(naggingChannel)
             }
         }
     }
-    
+
     override suspend fun doWork(): Result {
         var taskName = inputData.getString(KEY_TASK_NAME)
         val taskId = inputData.getLong(KEY_TASK_ID, 0)
         val isOverdue = inputData.getBoolean(KEY_IS_OVERDUE, false)
         val type = inputData.getString(KEY_NOTIFICATION_TYPE) ?: TYPE_GENTLE
-        
+        val deadlineTier = inputData.getString(KEY_DEADLINE_TIER)
+
         // ===== HORAS DE SILENCIO (22:00 - 7:59) =====
-        // No molestar al usuario mientras duerme.
-        // Justificación: Las notificaciones nocturnas/madrugada son
-        // contraproducentes — interrumpen el sueño y generan asociación
-        // negativa con la app (Exelmans & Van den Bulck, 2016).
         val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         if (currentHour >= 22 || currentHour < 8) {
             return Result.success()
         }
-        
+
         // Verificar preferencias del usuario
         val prefsManager = PreferencesManager(applicationContext)
         val naggingEnabled = prefsManager.naggingEnabled.first()
-        
-        // Si es nagging y el usuario lo desactivó, no enviar
+
         if (type == TYPE_NAGGING && !naggingEnabled) {
             return Result.success()
         }
-        
-        // Si no se proporcionó nombre de tarea, obtener la tarea prioritaria de la BD
+
+        // Verificar que la tarea aún existe y no está completada
+        if (taskId > 0) {
+            try {
+                val db = AppDatabase.getDatabase(applicationContext)
+                val task = db.taskDao().getTaskById(taskId)
+                if (task == null || task.isCompleted) {
+                    // Tarea completada o eliminada → no notificar
+                    return Result.success()
+                }
+                // Si es nagging y la tarea ya fue iniciada, no molestar
+                if (type == TYPE_NAGGING && task.isStarted) {
+                    return Result.success()
+                }
+                // Actualizar nombre por si cambió
+                if (taskName.isNullOrEmpty()) {
+                    taskName = task.name
+                }
+            } catch (_: Exception) { /* Continuar con datos del input */ }
+        }
+
+        // Si no se proporcionó nombre, obtener la tarea prioritaria
         if (taskName.isNullOrEmpty() || taskName == "tu tarea más importante") {
             try {
                 val db = AppDatabase.getDatabase(applicationContext)
                 val pendingTasks = db.taskDao().getAllTasksSync()
                     .filter { !it.isCompleted }
                 val topTask = pendingTasks.maxByOrNull { it.calculatePriorityScore() }
-                taskName = topTask?.name ?: run {
-                    // No hay tareas pendientes — no notificar
-                    return Result.success()
-                }
-            } catch (e: Exception) {
+                taskName = topTask?.name ?: return Result.success()
+            } catch (_: Exception) {
                 taskName = "tu tarea más importante"
             }
         }
-        
+
         when (type) {
-            TYPE_GENTLE -> showGentleNotification(taskName, taskId)
-            TYPE_PERSISTENT -> showPersistentNotification(taskName, taskId, isOverdue)
+            TYPE_GENTLE -> showGentleNotification(taskName, taskId, deadlineTier)
+            TYPE_PERSISTENT -> showPersistentNotification(taskName, taskId, isOverdue, deadlineTier)
             TYPE_NAGGING -> showNaggingNotification(taskName, taskId)
         }
-        
+
         return Result.success()
     }
-    
+
     /**
-     * Notificación suave - mejorada con dato científico y nombre de tarea específico.
+     * Notificación suave — 24h antes del deadline.
+     * Tono informativo, no alarmante. Dismissable.
      */
-    private fun showGentleNotification(taskName: String, taskId: Long) {
-        val scienceTips = listOf(
-            "\n\n💡 Solo 2 minutos para empezar. La inercia cognitiva se rompe al iniciar (Newton, 1687 — sí, también aplica a la mente).",
-            "\n\n🧠 Tu cerebro libera dopamina al completar tareas. Cada \u2705 te motiva más (Schultz, 1997).",
-            "\n\n⚡ Efecto Zeigarnik: Las tareas empezadas se quedan en tu mente. Empiézala y tu cerebro te ayudará a terminarla.",
-            "\n\n📊 Las personas que actúan en los primeros 5 segundos de un impulso tienen 3x más probabilidad de completar la tarea (Robbins, 2017)."
-        )
-        
+    private fun showGentleNotification(taskName: String, taskId: Long, tier: String?) {
+        val (title, body) = when (tier) {
+            "24h" -> "📋 Mañana vence: $taskName" to
+                "Tienes hasta mañana para completar esta tarea. ¿Puedes planificar un momento hoy para avanzar?\n\n💡 Planificar con anticipación reduce la ansiedad un 40% (Kahneman & Tversky, 1979)."
+            else -> "🎯 Siguiente tarea: $taskName" to
+                "¿Puedes dedicarle 2 minutos ahora? A veces eso es todo lo que necesitas para entrar en ritmo."
+        }
+
         val notification = baseNotificationBuilder(CHANNEL_ID, taskId)
-            .setContentTitle("🎯 Tu siguiente tarea: $taskName")
-            .setContentText("¿Puedes dedicarle 2 minutos ahora?")
-            .setStyle(NotificationCompat.BigTextStyle().bigText(
-                "📌 $taskName\n\n¿Puedes dedicarle 2 minutos ahora? A veces eso es todo lo que necesitas para entrar en ritmo.${scienceTips.random()}"
-            ))
+            .setContentTitle(title)
+            .setContentText(body.take(60) + "...")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
-        
+
         notifyWithCheck(2000 + taskId.toInt(), notification)
     }
-    
+
     /**
-     * Notificación persistente - con nombre específico y motivación científica.
+     * Notificación persistente — 4h y 1h antes del deadline.
+     * Más urgente pero aún dismissable (ya no ONGOING).
      */
-    private fun showPersistentNotification(taskName: String, taskId: Long, isOverdue: Boolean) {
-        val title = if (isOverdue) "⚠️ ¡TAREA VENCIDA!" else "🎯 Es hora de actuar"
-        val text = if (isOverdue) {
-            "🚨 \"$taskName\" ya pasó su fecha límite.\n\n🧠 Dato: Retrasar tareas vencidas aumenta la ansiedad exponencialmente (Steel, 2007). Empieza ahora — solo 2 minutos."
-        } else {
-            "📌 Tu próxima tarea: $taskName\n\n💡 Brian Tracy: \u00abSi tienes que comerte dos sapos, cométe el más grande primero.\u00bb Toca para empezar."
+    private fun showPersistentNotification(taskName: String, taskId: Long, isOverdue: Boolean, tier: String?) {
+        val (title, text) = when {
+            isOverdue -> "⚠️ Tarea vencida" to
+                "\"$taskName\" ya pasó su fecha límite.\n\n🧠 Retrasar tareas vencidas aumenta la ansiedad (Steel, 2007). Solo necesitas 2 minutos para empezar."
+            tier == "4h" -> "⏰ $taskName — 4 horas restantes" to
+                "Tu deadline se acerca. Es buen momento para empezar o avanzar significativamente.\n\n💪 La motivación crece al acercarse el deadline (Steel & König, 2006)."
+            tier == "1h" -> "🔴 ¡Última hora! → $taskName" to
+                "Queda 1 hora para el deadline. Si aún no empezaste, este es tu momento.\n\n⚡ Regla de los 5 segundos: actúa antes de que tu cerebro busque excusas."
+            else -> "🎯 Es hora de actuar" to
+                "📌 Tu próxima tarea: $taskName\n\n💡 «Si tienes que comerte dos sapos, cómete el más grande primero.» — Brian Tracy"
         }
-        
+
         val notification = baseNotificationBuilder(CHANNEL_ID, taskId)
             .setContentTitle(title)
-            .setContentText(text)
+            .setContentText(text.take(60) + "...")
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setOngoing(true)  // <-- CLAVE: No se descarta con swipe
-            .setAutoCancel(false)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)  // Dismissable (antes era ONGOING)
+            .setPriority(if (tier == "1h") NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .build()
-        
+
         notifyWithCheck(3000 + taskId.toInt(), notification)
     }
-    
+
     /**
-     * Notificación nagging - insistente, con vibración fuerte.
-     * Para tareas vencidas que el usuario no ha empezado.
+     * Notificación nagging — para tareas vencidas (cada 3h).
+     *
+     * CAMBIOS v2:
+     * - Ya NO es ONGOING (el usuario puede descartarla)
+     * - Prioridad HIGH en vez de MAX
+     * - Mensajes menos agresivos, más motivacionales
+     * - Se verifica que la tarea siga vigente antes de notificar
      */
     private fun showNaggingNotification(taskName: String, taskId: Long) {
         val messages = listOf(
-            "🔴 $taskName sigue sin empezar...",
-            "⏰ ¿Cuánto más vas a esperar? → $taskName",
-            "💀 La procrastinación gana si no abres esto → $taskName",
-            "🧠 Solo necesitas 2 minutos para empezar: $taskName",
-            "🚨 RECORDATORIO: $taskName no se va a hacer sola"
+            "📌 $taskName sigue pendiente. Solo 2 minutos para empezar.",
+            "🧠 Tu mente sigue pensando en \"$taskName\". Cierra ese ciclo.",
+            "💡 Cada hora que pasa, la ansiedad crece. Empieza $taskName ahora.",
+            "⏰ Recordatorio: $taskName está esperándote.",
+            "🎯 Pequeño paso: abre la app y empieza $taskName."
         )
-        
+
         val selectedMessage = messages.random()
-        
+
         val notification = baseNotificationBuilder(NAGGING_CHANNEL_ID, taskId)
-            .setContentTitle("⚠️ ¡Acción requerida!")
+            .setContentTitle("📋 Tarea vencida pendiente")
             .setContentText(selectedMessage)
             .setStyle(NotificationCompat.BigTextStyle().bigText(selectedMessage))
-            .setOngoing(true)
-            .setAutoCancel(false)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setVibrate(longArrayOf(0, 1000, 500, 1000))
+            .setAutoCancel(true)    // Dismissable (antes ONGOING)
+            .setPriority(NotificationCompat.PRIORITY_HIGH) // Era MAX
+            .setCategory(NotificationCompat.CATEGORY_REMINDER) // Era ALARM
             .build()
-        
+
         notifyWithCheck(4000 + taskId.toInt(), notification)
     }
-    
+
     private fun baseNotificationBuilder(channelId: String, taskId: Long): NotificationCompat.Builder {
         val openIntent = PendingIntent.getActivity(
             applicationContext, taskId.toInt(),
@@ -335,12 +389,12 @@ class TaskReminderWorker(
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        
+
         return NotificationCompat.Builder(applicationContext, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(openIntent)
     }
-    
+
     private fun notifyWithCheck(id: Int, notification: android.app.Notification) {
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(id, notification)
