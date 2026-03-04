@@ -2,6 +2,7 @@
 
 package com.example.vsprocrastination.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.vsprocrastination.BuildConfig
 import com.example.vsprocrastination.data.preferences.PreferencesManager
+import com.example.vsprocrastination.domain.PomodoroLevel
+import com.example.vsprocrastination.domain.PomodoroLevels
 import kotlinx.coroutines.launch
 
 /**
@@ -33,6 +36,10 @@ fun SettingsScreen(
     preferencesManager: PreferencesManager,
     onBack: () -> Unit,
     onClearCompleted: () -> Unit,
+    // Pomodoro progresivo
+    onCalibrate: () -> Unit = {},
+    onSetLevel: (Int) -> Unit = {},
+    onSetCustomDuration: (Int, Int) -> Unit = { _, _ -> },
     // Export/Import de datos
     isExportImportInProgress: Boolean = false,
     exportImportMessage: String? = null,
@@ -46,6 +53,12 @@ fun SettingsScreen(
     val naggingEnabled by preferencesManager.naggingEnabled.collectAsState(initial = true)
     val deadlineReminders by preferencesManager.deadlineRemindersEnabled.collectAsState(initial = true)
     val darkMode by preferencesManager.darkMode.collectAsState(initial = "system")
+    val pomodoroLevelIndex by preferencesManager.pomodoroLevel.collectAsState(initial = 1)
+    val pomodoroBreakDuration by preferencesManager.pomodoroBreakDuration.collectAsState(initial = 5)
+    val pomodoroIsCustom by preferencesManager.pomodoroIsCustom.collectAsState(initial = false)
+    val pomodoroSessionsAtLevel by preferencesManager.pomodoroSessionsAtLevel.collectAsState(initial = 0)
+    val pomodoroTotalSessions by preferencesManager.pomodoroTotalSessions.collectAsState(initial = 0)
+    val pomodoroHasCalibrated by preferencesManager.pomodoroHasCalibrated.collectAsState(initial = false)
     
     Scaffold(
         topBar = {
@@ -70,33 +83,155 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // === POMODORO ===
-            SettingsSection(title = "🍅 Pomodoro") {
-                Text(
-                    text = "Duración de la sesión de enfoque",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+            // === POMODORO PROGRESIVO ===
+            SettingsSection(title = "🍅 Pomodoro Progresivo") {
+                val currentLevel = PomodoroLevels.getLevel(pomodoroLevelIndex)
                 
-                FlowRow(
+                // Estado actual
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    listOf(15, 25, 30, 45).forEach { minutes ->
-                        FilterChip(
-                            selected = pomodoroDuration == minutes,
-                            onClick = {
-                                scope.launch { preferencesManager.setPomodoroDuration(minutes) }
-                            },
-                            label = { Text("${minutes}m") }
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = if (pomodoroIsCustom) "Personalizado" else currentLevel.label,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = "⏱ ${pomodoroDuration} min enfoque / ${pomodoroBreakDuration} min descanso",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                        if (!pomodoroIsCustom) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Sesiones en este nivel: $pomodoroSessionsAtLevel/${currentLevel.sessionsToAdvance.let { if (it == Int.MAX_VALUE) "∞" else it.toString() }} para avanzar",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Total de sesiones completadas: $pomodoroTotalSessions",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                         )
                     }
                 }
                 
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Tabla de niveles
+                Text(
+                    text = "Niveles disponibles",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                PomodoroLevels.levels.forEach { level ->
+                    val isSelected = !pomodoroIsCustom && pomodoroLevelIndex == level.index
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected) 
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) 
+                            else MaterialTheme.colorScheme.surface
+                        ),
+                        border = if (isSelected) BorderStroke(
+                            1.5.dp, MaterialTheme.colorScheme.primary
+                        ) else null,
+                        shape = RoundedCornerShape(10.dp),
+                        onClick = { onSetLevel(level.index) }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = level.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                                Text(
+                                    text = level.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "${level.focusMinutes} min",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "⏸ ${level.breakRecommendation}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Personalización manual
+                var showCustomDialog by remember { mutableStateOf(false) }
+                
+                OutlinedButton(
+                    onClick = { showCustomDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("✏️ Personalizar tiempos")
+                }
+                
+                if (showCustomDialog) {
+                    CustomPomodoroDialog(
+                        initialFocus = pomodoroDuration,
+                        initialBreak = pomodoroBreakDuration,
+                        onDismiss = { showCustomDialog = false },
+                        onConfirm = { focus, breakMin ->
+                            onSetCustomDuration(focus, breakMin)
+                            showCustomDialog = false
+                        }
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Recalibrar
+                OutlinedButton(
+                    onClick = onCalibrate,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("🎯 ${if (pomodoroHasCalibrated) "Recalibrar" else "Calibrar"} mi foco")
+                }
+                
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "💡 25 min es el estándar Pomodoro. Si te cuesta concentrarte, prueba 15 min.",
+                    text = "💡 La calibración mide tu tiempo de concentración natural y te asigna el nivel ideal.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -357,4 +492,80 @@ private fun SettingsSection(
             content()
         }
     }
+}
+
+/**
+ * Diálogo para personalizar tiempos de Pomodoro libremente.
+ */
+@Composable
+private fun CustomPomodoroDialog(
+    initialFocus: Int,
+    initialBreak: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (focusMinutes: Int, breakMinutes: Int) -> Unit
+) {
+    var focusMinutes by remember { mutableFloatStateOf(initialFocus.toFloat()) }
+    var breakMinutes by remember { mutableFloatStateOf(initialBreak.toFloat()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Personalizar Pomodoro") },
+        text = {
+            Column {
+                Text(
+                    text = "Tiempo de enfoque: ${focusMinutes.toInt()} min",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Slider(
+                    value = focusMinutes,
+                    onValueChange = { focusMinutes = it },
+                    valueRange = 5f..90f,
+                    steps = 16  // 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Text(
+                    text = "Tiempo de descanso: ${breakMinutes.toInt()} min",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Slider(
+                    value = breakMinutes,
+                    onValueChange = { breakMinutes = it },
+                    valueRange = 1f..30f,
+                    steps = 28
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Referencia rápida de la tabla
+                Text(
+                    text = "📋 Referencia recomendada:",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                PomodoroLevels.levels.forEach { level ->
+                    Text(
+                        text = "${level.focusMinutes} min → ${level.breakRecommendation} descanso",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(focusMinutes.toInt(), breakMinutes.toInt()) }) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }

@@ -13,8 +13,8 @@ android {
         applicationId = "com.example.vsprocrastination"
         minSdk = 24
         targetSdk = 36
-        versionCode = 9
-        versionName = "2.4.0"
+        versionCode = 10
+        versionName = "2.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

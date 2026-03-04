@@ -75,6 +75,12 @@ class MainActivity : ComponentActivity() {
                             preferencesManager = viewModel.preferencesManager,
                             onBack = { navController.popBackStack() },
                             onClearCompleted = { viewModel.clearCompletedTasks() },
+                            onCalibrate = {
+                                navController.popBackStack()
+                                viewModel.showCalibration()
+                            },
+                            onSetLevel = { levelIndex -> viewModel.setPomodoroLevelManual(levelIndex) },
+                            onSetCustomDuration = { focus, breakMin -> viewModel.setCustomPomodoroDuration(focus, breakMin) },
                             isExportImportInProgress = uiState.isExportImportInProgress,
                             exportImportMessage = uiState.exportImportMessage,
                             onExportClick = {

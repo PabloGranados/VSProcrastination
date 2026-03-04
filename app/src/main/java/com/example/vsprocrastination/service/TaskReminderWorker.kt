@@ -261,18 +261,34 @@ class TaskReminderWorker(
                 val db = AppDatabase.getDatabase(applicationContext)
                 val task = db.taskDao().getTaskById(taskId)
                 if (task == null || task.isCompleted) {
-                    // Tarea completada o eliminada → no notificar
+                    // Tarea completada o eliminada → cancelar worker y no notificar
+                    if (type == TYPE_NAGGING) {
+                        // Cancelar el worker periódico de nagging para que no vuelva a dispararse
+                        WorkManager.getInstance(applicationContext)
+                            .cancelUniqueWork("${WORK_TAG_NAGGING}_$taskId")
+                    }
+                    // Limpiar notificación previa de esta tarea si quedó visible
+                    val notifManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    notifManager.cancel(2000 + taskId.toInt())
+                    notifManager.cancel(3000 + taskId.toInt())
+                    notifManager.cancel(4000 + taskId.toInt())
                     return Result.success()
                 }
-                // Si es nagging y la tarea ya fue iniciada, no molestar
+                // Si es nagging y la tarea ya fue iniciada, cancelar nagging y no molestar
                 if (type == TYPE_NAGGING && task.isStarted) {
+                    WorkManager.getInstance(applicationContext)
+                        .cancelUniqueWork("${WORK_TAG_NAGGING}_$taskId")
                     return Result.success()
                 }
                 // Actualizar nombre por si cambió
                 if (taskName.isNullOrEmpty()) {
                     taskName = task.name
                 }
-            } catch (_: Exception) { /* Continuar con datos del input */ }
+            } catch (_: Exception) {
+                // Si no podemos verificar el estado de la tarea, NO enviar notificación
+                // Es preferible perder una notificación que enviar una para una tarea eliminada
+                return Result.success()
+            }
         }
 
         // Si no se proporcionó nombre, obtener la tarea prioritaria

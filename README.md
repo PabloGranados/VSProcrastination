@@ -1,18 +1,66 @@
 # VS Procrastination
 
-**v2.4.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.5.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
 
 ## Descargar APK
 
-📲 **[Descargar VS Procrastination v2.4.0](releases/VS-Procrastination-v2.4.0.apk)**
+📲 **[Descargar VS Procrastination v2.5.0](releases/VS-Procrastination-v2.5.0.apk)**
 
 > Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
 
-## Novedades en v2.4.0
+## Novedades en v2.5.0
 
-### 🔔 Reingeniería del sistema de notificaciones — Menos intrusivo, más inteligente
+### 🍅 Sistema Pomodoro Progresivo — Calibración + niveles adaptativos
+
+**El Pomodoro ya no es "25 min para todos".** El nuevo sistema mide tu capacidad real de concentración y te asigna un nivel personalizado que evoluciona contigo.
+
+#### Calibración inicial
+- **Cronómetro ascendente**: la primera vez que inicias una sesión, la app te pide trabajar enfocado en algo y presionar "Parar" cuando pierdes el foco
+- El tiempo medido determina tu **nivel inicial** automáticamente
+- Puedes saltar la calibración (usa 25 min estándar) o recalibrar en cualquier momento desde Ajustes
+
+#### 7 niveles de concentración
+
+| Nivel | Enfoque | Descanso | Sesiones para avanzar |
+|-------|---------|----------|-----------------------|
+| 🌱 Principiante | 20 min | 3-5 min | 5 |
+| 🍅 Clásico | 25 min | 5 min | 5 |
+| 📈 Intermedio | 30 min | 5-7 min | 6 |
+| 🚀 Avanzado | 40 min | 8-10 min | 6 |
+| 🎯 Experto | 50 min | 10 min | 7 |
+| 🧠 Deep Work | 60 min | 10-15 min | 8 |
+| ⚡ Ultra Focus | 90 min | 20-30 min | ∞ (máximo) |
+
+#### Progresión automática
+- Al completar suficientes sesiones exitosas en tu nivel actual, la app sugiere **subir al siguiente nivel**
+- Puedes aceptar o quedarte en tu nivel actual
+- El contador se resetea si rechazas, para no preguntar en cada sesión
+
+#### Sugerencia de descanso
+- Al completar cada sesión Pomodoro, se muestra un **diálogo de descanso recomendado** con el tiempo según tu nivel
+- Justificación científica incluida: el cerebro consolida durante el reposo
+
+#### Personalización total
+- **Selección manual de nivel**: toca cualquier nivel en la tabla de Ajustes para adoptarlo
+- **Tiempos personalizados**: sliders de enfoque (5-90 min) y descanso (1-30 min) para valores libres
+- **Recalibración**: repite la medición de foco cuando quieras
+- Indicador de nivel y descanso recomendado visible durante la sesión de enfoque
+
+### 🏗️ Arquitectura
+- **PomodoroLevel.kt**: modelo de datos con tabla de 7 niveles, lógica de calibración y progresión
+- **PreferencesManager**: 6 nuevas preferencias (level, sessionsAtLevel, hasCalibrated, breakDuration, isCustom, totalSessions)
+- **MainViewModel**: calibración (start/stop/cancel), progresión automática, personalización manual
+- **MainScreen**: CalibrationView (cronómetro ascendente fullscreen), BreakSuggestionDialog, LevelUpDialog
+- **SettingsScreen**: sección Pomodoro rediseñada con tabla de niveles, personalización y recalibración
+- **FocusModeView**: muestra nivel actual y descanso recomendado durante la sesión
+
+## Novedades anteriores
+
+### 🔔 Reingeniería del sistema de notificaciones (v2.4.0)
+
+### 🔔 Reingeniería del sistema de notificaciones — Menos intrusivo, más inteligente (v2.4.0)
 
 **Problema resuelto: Las notificaciones dejaban de funcionar tras reiniciar el dispositivo.** El BootReceiver tenía `exported="false"` en el manifiesto, impidiendo recibir `BOOT_COMPLETED`. Además, los recordatorios one-shot de deadline no se reprogramaban al reiniciar.
 
@@ -214,7 +262,7 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 | Efecto Zeigarnik | Las tareas iniciadas se priorizan automáticamente |
 | Ley de Parkinson | Deadlines con fecha y hora exacta generan urgencia real |
 | Regla de los 2 minutos (David Allen) | Tareas rápidas se marcan y priorizan para eliminarlas primero |
-| Técnica Pomodoro (Cirillo) | Modo Enfoque con timer configurable |
+| Técnica Pomodoro (Cirillo) | Modo Enfoque progresivo con calibración + 7 niveles adaptativos |
 | Temporal Motivation Theory (Steel) | Countdown visible en notificaciones al acercarse el deadline |
 | Compromiso público (Cialdini) | La notificación persistente del timer actúa como compromiso visible |
 | Implementation Intentions (Gollwitzer) | Notificaciones contextuales que anclan la tarea al momento presente |
@@ -237,12 +285,16 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 - Undo al completar por si fue un tap accidental
 - Saltar la tarea sugerida sin eliminarla
 
-### Modo Enfoque (Pomodoro)
+### Modo Enfoque (Pomodoro Progresivo)
 
-- Timer configurable (15 a 60 minutos) como Foreground Service
-- Cronómetro regresivo nativo en la notificación, visible fuera de la app en tiempo real
-- Barra de progreso en la notificación
-- Botón "Detener" directamente desde la notificación
+- **Calibración inicial**: cronómetro ascendente para medir tu tiempo de concentración natural
+- **7 niveles progresivos**: de 20 min (Principiante) a 90 min (Ultra Focus) con descansos recomendados
+- **Progresión automática**: al completar suficientes sesiones, la app sugiere subir de nivel
+- **Sugerencia de descanso**: al completar cada sesión, muestra el descanso recomendado para tu nivel
+- **Personalización total**: elige nivel manualmente, ajusta tiempos con sliders, o recalibra cuando quieras
+- Timer como Foreground Service con cronómetro regresivo nativo en la notificación
+- Barra de progreso en la notificación con botón "Detener"
+- Indicador de nivel y descanso recomendado visible durante la sesión
 - Detección de salida de la app durante sesión activa con notificación para que vuelvas
 - Registro automático del tiempo trabajado por tarea
 
@@ -269,7 +321,7 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 
 ### Configuración
 
-- Duración del Pomodoro ajustable
+- **Pomodoro progresivo**: tabla de 7 niveles, selección manual, personalización con sliders, recalibración
 - Toggle de notificaciones nagging y recordatorios de deadline
 - Tema: claro, oscuro o automático del sistema
 - Export/Import JSON para respaldo y transferencia entre dispositivos
@@ -335,7 +387,8 @@ app/src/main/java/com/example/vsprocrastination/
 ├── domain/
 │   ├── PriorityCalculator.kt    # Algoritmo de priorización + stats
 │   ├── StreakCalculator.kt      # Cálculo de rachas consecutivas
-│   └── MotivationalPhrases.kt   # Frases contextuales por categoría
+│   ├── MotivationalPhrases.kt   # Frases contextuales por categoría
+│   └── PomodoroLevel.kt         # 7 niveles progresivos + calibración + progresión
 ├── service/
 │   ├── FocusService.kt          # Foreground Service (Pomodoro + cronómetro nativo)
 │   ├── TaskReminderWorker.kt    # WorkManager (recordatorios escalonados 24h/4h/1h + nagging 3h)
@@ -345,10 +398,10 @@ app/src/main/java/com/example/vsprocrastination/
 │   └── BootReceiver.kt          # Reprograma TODO tras reboot (workers + one-shots + nagging)
 ├── ui/
 │   ├── screens/
-│   │   ├── MainScreen.kt        # Pantalla principal (layout adaptativo compact/expanded)
+│   │   ├── MainScreen.kt        # Pantalla principal + CalibrationView + BreakDialog + LevelUpDialog
 │   │   ├── HabitTrackerScreen.kt # Pantalla de hábitos diarios
 │   │   ├── ContributionCalendar.kt # Mapa de calor de actividad (tareas + hábitos)
-│   │   ├── SettingsScreen.kt    # Configuración (padding adaptativo)
+│   │   ├── SettingsScreen.kt    # Configuración (Pomodoro progresivo + padding adaptativo)
 │   │   └── WeeklySummaryScreen.kt # Resumen semanal (padding adaptativo)
 │   ├── viewmodel/
 │   │   ├── MainViewModel.kt     # Estado central de la app
@@ -374,6 +427,25 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 - `RECEIVE_BOOT_COMPLETED` — reprogramar workers tras reinicio
 - `WAKE_LOCK` — WorkManager interno
 ## Changelog
+
+### v2.5.0 (marzo 2026)
+- **Sistema Pomodoro progresivo**: calibración inicial + 7 niveles adaptativos
+- Cronómetro ascendente de calibración para medir foco natural del usuario
+- Tabla de niveles: Principiante (20 min) → Ultra Focus (90 min) con descansos recomendados
+- Progresión automática: sugiere subir de nivel tras completar suficientes sesiones
+- Diálogo de descanso recomendado al completar cada sesión Pomodoro
+- Selección manual de nivel en Ajustes (tabla completa con tap para elegir)
+- Personalización libre con sliders: enfoque 5-90 min, descanso 1-30 min
+- Botón de calibración/recalibración en Ajustes
+- Indicador de nivel y descanso visible durante sesión de enfoque
+- Contador de sesiones por nivel y total
+- PomodoroLevel.kt: modelo de datos, lógica de calibración y progresión
+- PreferencesManager: 6 nuevas preferencias persistentes (DataStore)
+- MainScreen: CalibrationView, BreakSuggestionDialog, LevelUpDialog
+- SettingsScreen: sección Pomodoro completamente rediseñada
+- FocusModeView: badge de nivel en portrait y landscape
+- Primera sesión redirige a calibración si no se ha hecho
+- versionCode 9 → 10, versionName 2.4.0 → 2.5.0
 
 ### v2.4.0 (febrero 2026)
 - **Fix crítico**: BootReceiver con `exported="true"` — las notificaciones ahora sobreviven al reinicio del dispositivo
@@ -502,7 +574,7 @@ Para generar el APK de release:
 El APK se genera en `app/build/outputs/apk/release/`. Cópialo a la carpeta `releases/` y renómbralo:
 
 ```bash
-cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.4.0.apk
+cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.5.0.apk
 ```
 
 Para el APK de debug (con firma automática):

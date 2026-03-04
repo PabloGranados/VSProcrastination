@@ -111,6 +111,8 @@ data class Task(
     
     /**
      * Texto amigable para mostrar el deadline.
+     * Usa comparación por DÍAS CALENDARIO (no por horas) para evitar
+     * que "Mañana" se muestre como "Hoy" en horas nocturnas.
      */
     fun getDeadlineDisplayText(currentTimeMillis: Long = System.currentTimeMillis()): String {
         val deadline = deadlineMillis ?: return "Sin fecha límite"
@@ -120,22 +122,43 @@ data class Task(
         val minutesRemaining = timeRemainingMillis / (1000f * 60f)
         
         // Formatear hora del deadline
-        val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = deadline
-        val hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
-        val minute = cal.get(java.util.Calendar.MINUTE)
+        val deadlineCal = java.util.Calendar.getInstance()
+        deadlineCal.timeInMillis = deadline
+        val hour = deadlineCal.get(java.util.Calendar.HOUR_OF_DAY)
+        val minute = deadlineCal.get(java.util.Calendar.MINUTE)
         val timeStr = if (hour != 23 || minute != 59) {
             " ${String.format("%02d:%02d", hour, minute)}"
         } else ""
         
+        // Calcular diferencia en DÍAS CALENDARIO (zona horaria local)
+        val calendarDaysUntil = run {
+            val nowCal = java.util.Calendar.getInstance().apply { timeInMillis = currentTimeMillis }
+            // Truncar ambas fechas a medianoche para comparar solo días
+            val nowMidnight = java.util.Calendar.getInstance().apply {
+                timeInMillis = currentTimeMillis
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val deadlineMidnight = java.util.Calendar.getInstance().apply {
+                timeInMillis = deadline
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            ((deadlineMidnight.timeInMillis - nowMidnight.timeInMillis) / (24 * 60 * 60 * 1000L)).toInt()
+        }
+        
         return when {
-            hoursRemaining <= 0 -> "⚠️ ¡VENCIDA!"
+            timeRemainingMillis <= 0 -> "⚠️ ¡VENCIDA!"
             minutesRemaining <= 60 -> "🔥 ${minutesRemaining.toInt()} min"
-            hoursRemaining <= 2 -> "🔥 ${hoursRemaining.toInt()}h$timeStr"
-            hoursRemaining <= 24 -> "⏰ Hoy$timeStr"
-            hoursRemaining <= 48 -> "📅 Mañana$timeStr"
-            hoursRemaining <= 72 -> "📅 En 2-3 días$timeStr"
-            hoursRemaining <= 168 -> "📆 Esta semana"
+            hoursRemaining <= 2 -> "🔥 ${String.format("%.1f", hoursRemaining)}h$timeStr"
+            calendarDaysUntil <= 0 -> "⏰ Hoy$timeStr"
+            calendarDaysUntil == 1 -> "📅 Mañana$timeStr"
+            calendarDaysUntil <= 3 -> "📅 En $calendarDaysUntil días$timeStr"
+            calendarDaysUntil <= 7 -> "📆 Esta semana"
             else -> "📆 Más de una semana"
         }
     }

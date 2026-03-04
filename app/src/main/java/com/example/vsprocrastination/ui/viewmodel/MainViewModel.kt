@@ -16,6 +16,8 @@ import com.example.vsprocrastination.data.repository.HabitRepository
 import com.example.vsprocrastination.data.repository.TaskRepository
 import com.example.vsprocrastination.data.sync.ExportImportManager
 import com.example.vsprocrastination.domain.MotivationalPhrases
+import com.example.vsprocrastination.domain.PomodoroLevel
+import com.example.vsprocrastination.domain.PomodoroLevels
 import com.example.vsprocrastination.domain.PriorityCalculator
 import com.example.vsprocrastination.domain.StreakCalculator
 import com.example.vsprocrastination.domain.TaskStats
@@ -25,8 +27,8 @@ import com.example.vsprocrastination.service.FocusService
 import com.example.vsprocrastination.service.SmartNotificationWorker
 import com.example.vsprocrastination.service.TaskReminderWorker
 import com.example.vsprocrastination.service.TimerState
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 
 /**
  * Estado de la UI principal.
@@ -53,6 +55,18 @@ data class MainUiState(
     val motivationalPhrase: String = "",
     val suggestedTaskSubtasks: List<Subtask> = emptyList(),
     val pomodoroDuration: Int = 25,
+    // Sistema Pomodoro progresivo
+    val pomodoroLevel: PomodoroLevel = PomodoroLevels.getLevel(1),
+    val pomodoroSessionsAtLevel: Int = 0,
+    val pomodoroTotalSessions: Int = 0,
+    val pomodoroHasCalibrated: Boolean = false,
+    val pomodoroBreakDuration: Int = 5,
+    val pomodoroIsCustom: Boolean = false,
+    val showCalibrationMode: Boolean = false,
+    val calibrationElapsedMillis: Long = 0,
+    val isCalibrationRunning: Boolean = false,
+    val showBreakSuggestion: Boolean = false,
+    val showLevelUpSuggestion: Boolean = false,
     // Export/Import de datos
     val isExportImportInProgress: Boolean = false,
     val exportImportMessage: String? = null,
@@ -188,9 +202,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     current.copy(timerState = timerState)
                 }
                 
-                // Si el timer se completó, registrar el tiempo
+                // Si el timer se completó, registrar el tiempo y la sesión Pomodoro
                 if (timerState.isComplete && timerState.taskId > 0) {
                     repository.addTimeWorked(timerState.taskId, timerState.totalMillis)
+                    onPomodoroSessionCompleted()
                 }
             }
         }
@@ -211,6 +226,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             preferencesManager.pomodoroDuration.collect { duration ->
                 _uiState.update { it.copy(pomodoroDuration = duration) }
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.pomodoroLevel.collect { levelIndex ->
+                _uiState.update { it.copy(pomodoroLevel = PomodoroLevels.getLevel(levelIndex)) }
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.pomodoroSessionsAtLevel.collect { sessions ->
+                _uiState.update { it.copy(pomodoroSessionsAtLevel = sessions) }
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.pomodoroTotalSessions.collect { total ->
+                _uiState.update { it.copy(pomodoroTotalSessions = total) }
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.pomodoroHasCalibrated.collect { calibrated ->
+                _uiState.update { it.copy(pomodoroHasCalibrated = calibrated) }
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.pomodoroBreakDuration.collect { breakDur ->
+                _uiState.update { it.copy(pomodoroBreakDuration = breakDur) }
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.pomodoroIsCustom.collect { custom ->
+                _uiState.update { it.copy(pomodoroIsCustom = custom) }
             }
         }
     }
@@ -240,17 +285,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Programa recordatorios insistentes para tareas vencidas.
      * Solo si el usuario tiene nagging habilitado.
+     * También CANCELA nagging para tareas que ya no lo necesitan.
      */
     private fun scheduleOverdueReminders(tasks: List<Task>) {
         viewModelScope.launch {
             val naggingEnabled = preferencesManager.naggingEnabled.first()
-            if (!naggingEnabled) return@launch
-            
             val now = System.currentTimeMillis()
-            tasks.filter { 
-                !it.isCompleted && !it.isStarted &&
-                it.deadlineMillis != null && it.deadlineMillis < now 
-            }.forEach { task ->
+            
+            // Identificar tareas que SÍ necesitan nagging
+            val overdueNeedingNagging = if (naggingEnabled) {
+                tasks.filter {
+                    !it.isCompleted && !it.isStarted &&
+                    it.deadlineMillis != null && it.deadlineMillis < now
+                }
+            } else emptyList()
+            
+            val overdueIds = overdueNeedingNagging.map { it.id }.toSet()
+            
+            // Cancelar nagging para tareas que ya NO necesitan (completadas, eliminadas, iniciadas)
+            tasks.filter { it.isCompleted || it.isStarted || it.deadlineMillis == null || it.deadlineMillis >= now }
+                .filter { it.id !in overdueIds }
+                .forEach { task ->
+                    TaskReminderWorker.cancelNaggingReminder(context, task.id)
+                }
+            
+            // Programar nagging para las que sí necesitan
+            overdueNeedingNagging.forEach { task ->
                 TaskReminderWorker.scheduleNaggingReminder(context, task.name, task.id)
             }
         }
@@ -285,10 +345,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     /**
      * Inicia la tarea sugerida y entra en Modo Enfoque.
+     * Si no se ha calibrado, muestra primero la calibración.
      * Lanza el FocusService como Foreground Service.
      */
     fun startSuggestedTask(durationMinutes: Int = _uiState.value.pomodoroDuration) {
         val task = _uiState.value.suggestedTask ?: return
+        
+        // Si no se ha calibrado, mostrar calibración primero
+        if (!_uiState.value.pomodoroHasCalibrated) {
+            _uiState.update { it.copy(showCalibrationMode = true) }
+            return
+        }
         
         viewModelScope.launch {
             repository.startTask(task.id)
@@ -485,9 +552,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     /**
      * Limpia todas las tareas completadas.
+     * Cancela todos los recordatorios asociados antes de eliminarlas.
      */
     fun clearCompletedTasks() {
         viewModelScope.launch {
+            // Cancelar todos los recordatorios de tareas completadas antes de borrarlas
+            val allTasks = _uiState.value.allTasks
+            allTasks.filter { it.isCompleted }.forEach { task ->
+                TaskReminderWorker.cancelNaggingReminder(context, task.id)
+                TaskReminderWorker.cancelDeadlineReminders(context, task.id)
+                DeadlineCountdownWorker.cancelNotification(context, task.id)
+                // Limpiar notificaciones visibles
+                val notifManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                notifManager.cancel(2000 + task.id.toInt())
+                notifManager.cancel(3000 + task.id.toInt())
+                notifManager.cancel(4000 + task.id.toInt())
+            }
             repository.clearCompletedTasks()
         }
     }
@@ -531,6 +611,179 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     suspend fun getSubtasksForTask(taskId: Long): List<Subtask> {
         return repository.getSubtasksForTaskSync(taskId)
+    }
+    
+    // === Pomodoro Progresivo: Calibración y Niveles ===
+    
+    private var calibrationStartTime: Long = 0L
+    private var calibrationJob: Job? = null
+    
+    /**
+     * Inicia el modo calibración para medir el tiempo de enfoque natural.
+     * El usuario trabaja con un cronómetro ascendente y para cuando pierde el foco.
+     */
+    fun startCalibration() {
+        calibrationStartTime = System.currentTimeMillis()
+        _uiState.update { it.copy(
+            showCalibrationMode = true,
+            isCalibrationRunning = true,
+            calibrationElapsedMillis = 0
+        )}
+        
+        calibrationJob?.cancel()
+        calibrationJob = viewModelScope.launch {
+            while (isActive) {
+                val elapsed = System.currentTimeMillis() - calibrationStartTime
+                _uiState.update { it.copy(calibrationElapsedMillis = elapsed) }
+                delay(1000)
+            }
+        }
+    }
+    
+    /**
+     * Detiene la calibración y determina el nivel basado en el tiempo medido.
+     */
+    fun stopCalibration() {
+        calibrationJob?.cancel()
+        val elapsed = System.currentTimeMillis() - calibrationStartTime
+        val measuredMinutes = (elapsed / 60000).toInt()
+        
+        val recommendedLevel = PomodoroLevels.levelForCalibrationMinutes(measuredMinutes)
+        
+        viewModelScope.launch {
+            preferencesManager.setPomodoroLevel(recommendedLevel.index)
+            preferencesManager.setPomodoroDuration(recommendedLevel.focusMinutes)
+            preferencesManager.setPomodoroBreakDuration(recommendedLevel.breakMidpointMinutes)
+            preferencesManager.setPomodoroHasCalibrated(true)
+            preferencesManager.setPomodoroSessionsAtLevel(0)
+            preferencesManager.setPomodoroIsCustom(false)
+        }
+        
+        _uiState.update { it.copy(
+            showCalibrationMode = false,
+            isCalibrationRunning = false,
+            calibrationElapsedMillis = elapsed,
+            pomodoroLevel = recommendedLevel,
+            pomodoroDuration = recommendedLevel.focusMinutes,
+            pomodoroBreakDuration = recommendedLevel.breakMidpointMinutes,
+            pomodoroHasCalibrated = true
+        )}
+    }
+    
+    /**
+     * Cancela la calibración sin guardar.
+     */
+    fun cancelCalibration() {
+        calibrationJob?.cancel()
+        _uiState.update { it.copy(
+            showCalibrationMode = false,
+            isCalibrationRunning = false,
+            calibrationElapsedMillis = 0
+        )}
+    }
+    
+    /**
+     * Muestra la pantalla de calibración (para recalibrar en cualquier momento).
+     */
+    fun showCalibration() {
+        _uiState.update { it.copy(showCalibrationMode = true) }
+    }
+    
+    /**
+     * Registra una sesión Pomodoro completada y evalúa progresión de nivel.
+     */
+    fun onPomodoroSessionCompleted() {
+        viewModelScope.launch {
+            preferencesManager.incrementPomodoroSessionsAtLevel()
+            preferencesManager.incrementPomodoroTotalSessions()
+            
+            val currentLevel = _uiState.value.pomodoroLevel
+            val sessionsAtLevel = preferencesManager.pomodoroSessionsAtLevel.first() 
+            val isCustom = preferencesManager.pomodoroIsCustom.first()
+            
+            // Sugerir avance solo si no es personalizado y hay siguiente nivel
+            if (!isCustom && currentLevel.index < PomodoroLevels.maxLevelIndex) {
+                if (sessionsAtLevel >= currentLevel.sessionsToAdvance) {
+                    _uiState.update { it.copy(showLevelUpSuggestion = true) }
+                }
+            }
+            
+            // Mostrar sugerencia de descanso
+            _uiState.update { it.copy(showBreakSuggestion = true) }
+        }
+    }
+    
+    /**
+     * Acepta la sugerencia de subir de nivel.
+     */
+    fun acceptLevelUp() {
+        val currentLevel = _uiState.value.pomodoroLevel
+        val nextLevel = PomodoroLevels.nextLevel(currentLevel.index) ?: return
+        
+        viewModelScope.launch {
+            preferencesManager.setPomodoroLevel(nextLevel.index)
+            preferencesManager.setPomodoroDuration(nextLevel.focusMinutes)
+            preferencesManager.setPomodoroBreakDuration(nextLevel.breakMidpointMinutes)
+            preferencesManager.setPomodoroSessionsAtLevel(0)
+        }
+        
+        _uiState.update { it.copy(showLevelUpSuggestion = false) }
+    }
+    
+    /**
+     * Rechaza la sugerencia de subir de nivel (se queda en el actual).
+     */
+    fun declineLevelUp() {
+        _uiState.update { it.copy(showLevelUpSuggestion = false) }
+        // Reset contador para que no pregunte en cada sesión
+        viewModelScope.launch {
+            preferencesManager.setPomodoroSessionsAtLevel(0)
+        }
+    }
+    
+    /**
+     * Oculta la sugerencia de descanso.
+     */
+    fun dismissBreakSuggestion() {
+        _uiState.update { it.copy(showBreakSuggestion = false) }
+    }
+    
+    /**
+     * Cambia manualmente el nivel Pomodoro (desde Settings).
+     */
+    fun setPomodoroLevelManual(levelIndex: Int) {
+        val level = PomodoroLevels.getLevel(levelIndex)
+        viewModelScope.launch {
+            preferencesManager.setPomodoroLevel(level.index)
+            preferencesManager.setPomodoroDuration(level.focusMinutes)
+            preferencesManager.setPomodoroBreakDuration(level.breakMidpointMinutes)
+            preferencesManager.setPomodoroSessionsAtLevel(0)
+            preferencesManager.setPomodoroIsCustom(false)
+        }
+    }
+    
+    /**
+     * Establece una duración totalmente personalizada.
+     */
+    fun setCustomPomodoroDuration(focusMinutes: Int, breakMinutes: Int) {
+        viewModelScope.launch {
+            preferencesManager.setPomodoroDuration(focusMinutes)
+            preferencesManager.setPomodoroBreakDuration(breakMinutes)
+            preferencesManager.setPomodoroIsCustom(true)
+            // Asignar el nivel más cercano como referencia
+            val closest = PomodoroLevels.closestLevel(focusMinutes)
+            preferencesManager.setPomodoroLevel(closest.index)
+        }
+    }
+    
+    /**
+     * Salta la calibración inicial y usa valores por defecto (25/5).
+     */
+    fun skipCalibration() {
+        viewModelScope.launch {
+            preferencesManager.setPomodoroHasCalibrated(true)
+        }
+        _uiState.update { it.copy(showCalibrationMode = false) }
     }
     
     // === Export/Import de datos ===

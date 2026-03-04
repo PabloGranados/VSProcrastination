@@ -120,6 +120,7 @@ fun MainScreen(
         ) {
             when {
                 uiState.isLoading -> LoadingState()
+                uiState.showCalibrationMode -> CalibrationView(uiState, viewModel)
                 uiState.isInFocusMode -> FocusModeView(uiState, viewModel)
                 uiState.suggestedTask == null -> EmptyState { viewModel.toggleAddTaskDialog(true) }
                 else -> MainContent(uiState, viewModel, onNavigateToWeeklySummary)
@@ -162,6 +163,29 @@ fun MainScreen(
                         onConfirm = { name, deadline, difficulty, priority, isQuick, subtasks ->
                             viewModel.saveEditedTask(name, deadline, difficulty, priority, isQuick, subtasks)
                         }
+                    )
+                }
+            }
+            
+            // Diálogo de sugerencia de descanso tras Pomodoro
+            if (uiState.showBreakSuggestion) {
+                BreakSuggestionDialog(
+                    breakDuration = uiState.pomodoroBreakDuration,
+                    breakRecommendation = uiState.pomodoroLevel.breakRecommendation,
+                    onDismiss = { viewModel.dismissBreakSuggestion() }
+                )
+            }
+            
+            // Diálogo de sugerencia de subir de nivel
+            if (uiState.showLevelUpSuggestion) {
+                val nextLevel = com.example.vsprocrastination.domain.PomodoroLevels
+                    .nextLevel(uiState.pomodoroLevel.index)
+                if (nextLevel != null) {
+                    LevelUpDialog(
+                        currentLevel = uiState.pomodoroLevel,
+                        nextLevel = nextLevel,
+                        onAccept = { viewModel.acceptLevelUp() },
+                        onDecline = { viewModel.declineLevelUp() }
                     )
                 }
             }
@@ -893,6 +917,11 @@ private fun FocusModeView(
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White.copy(alpha = 0.8f)
                     )
+                    Text(
+                        text = "Nivel: ${uiState.pomodoroLevel.label} • Descanso: ${uiState.pomodoroLevel.breakRecommendation}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = taskName,
@@ -970,6 +999,12 @@ private fun FocusModeView(
                 color = Color.White.copy(alpha = 0.8f)
             )
             
+            Text(
+                text = "Nivel: ${uiState.pomodoroLevel.label} • Descanso: ${uiState.pomodoroLevel.breakRecommendation}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.5f)
+            )
+            
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
@@ -1045,6 +1080,301 @@ private fun FocusModeView(
         }
         }
     }
+}
+
+/**
+ * Vista de calibración: cronómetro ascendente para medir el foco natural.
+ *
+ * JUSTIFICACIÓN PSICOLÓGICA:
+ * En vez de imponer un tiempo fijo, medimos la capacidad real del usuario.
+ * Esto respeta diferencias individuales (TDAH vs. neurotypical) y
+ * establece un punto de partida realista que genera éxito temprano.
+ */
+@Composable
+private fun CalibrationView(
+    uiState: MainUiState,
+    viewModel: MainViewModel
+) {
+    val elapsed = uiState.calibrationElapsedMillis
+    val minutes = (elapsed / 1000 / 60).toInt()
+    val seconds = ((elapsed / 1000) % 60).toInt()
+    val formattedTime = String.format("%02d:%02d", minutes, seconds)
+    val isRunning = uiState.isCalibrationRunning
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.tertiary,
+                        MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .widthIn(max = 480.dp)
+                .padding(32.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = "🎯 CALIBRACIÓN",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White.copy(alpha = 0.8f)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = if (!isRunning && elapsed == 0L)
+                    "Vamos a medir tu tiempo de concentración natural"
+                else if (isRunning)
+                    "Trabaja enfocado en algo... presiona PARAR cuando pierdas el foco"
+                else
+                    "¡Listo! Tu tiempo de enfoque natural:",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White.copy(alpha = 0.9f),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Cronómetro ascendente gigante
+            Text(
+                text = formattedTime,
+                style = MaterialTheme.typography.displayLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                fontSize = 72.sp
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (!isRunning && elapsed > 0) {
+                // Mostrar resultado y nivel asignado
+                val measuredMin = (elapsed / 60000).toInt()
+                val level = com.example.vsprocrastination.domain.PomodoroLevels
+                    .levelForCalibrationMinutes(measuredMin)
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.2f)
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Nivel recomendado: ${level.label}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "⏱ ${level.focusMinutes} min de enfoque / ${level.breakRecommendation} de descanso",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = level.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "💡 Puedes cambiar esto en cualquier momento desde Ajustes",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Botones
+            if (!isRunning && elapsed == 0L) {
+                // Estado inicial: empezar calibración
+                Button(
+                    onClick = { viewModel.startCalibration() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = MaterialTheme.colorScheme.tertiary
+                    ),
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    Text("▶ Empezar", fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextButton(
+                    onClick = { viewModel.skipCalibration() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.White.copy(alpha = 0.7f))
+                ) {
+                    Text("Saltar (usar 25 min estándar)")
+                }
+            } else if (isRunning) {
+                // Corriendo: botón de parar
+                Button(
+                    onClick = { viewModel.stopCalibration() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    Text("⏹ Parar — perdí el foco", fontWeight = FontWeight.Bold)
+                }
+            } else {
+                // Resultado mostrado: confirmar
+                Button(
+                    onClick = { viewModel.skipCalibration() }, // Ya se guardó en stopCalibration
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = MaterialTheme.colorScheme.tertiary
+                    ),
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    Text("✅ ¡Perfecto, empezar!", fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = { viewModel.startCalibration() },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    Text("🔄 Repetir calibración")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = { viewModel.cancelCalibration() },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White.copy(alpha = 0.6f))
+            ) {
+                Text("Cancelar")
+            }
+        }
+    }
+}
+
+/**
+ * Diálogo de sugerencia de descanso tras completar sesión.
+ */
+@Composable
+fun BreakSuggestionDialog(
+    breakDuration: Int,
+    breakRecommendation: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Text("☕", fontSize = 32.sp) },
+        title = { Text("¡Sesión completada!") },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "Tómate un descanso de $breakRecommendation.",
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "El descanso es tan importante como el enfoque.\n" +
+                    "Tu cerebro consolida lo aprendido durante el reposo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Entendido 👍")
+            }
+        }
+    )
+}
+
+/**
+ * Diálogo para sugerir avance de nivel.
+ */
+@Composable
+fun LevelUpDialog(
+    currentLevel: com.example.vsprocrastination.domain.PomodoroLevel,
+    nextLevel: com.example.vsprocrastination.domain.PomodoroLevel,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDecline,
+        icon = { Text("🚀", fontSize = 32.sp) },
+        title = { Text("¡Hora de subir de nivel!") },
+        text = {
+            Column {
+                Text(
+                    "Has completado suficientes sesiones en el nivel \"${currentLevel.label}\".",
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "Siguiente nivel: ${nextLevel.label}",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            "⏱ ${nextLevel.focusMinutes} min enfoque / ${nextLevel.breakRecommendation} descanso",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            nextLevel.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "💡 Puedes cambiar de nivel en Ajustes cuando quieras.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onAccept) {
+                Text("¡Subir! 🔥")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDecline) {
+                Text("Quedarme aquí")
+            }
+        }
+    )
 }
 
 /**
@@ -1442,36 +1772,43 @@ private fun TaskDialog(
                     val deadline = if (hasDeadline) {
                         when (deadlineOption) {
                             0 -> {
+                                // Hoy: usar el día actual con la hora seleccionada
                                 val cal = java.util.Calendar.getInstance()
                                 cal.set(java.util.Calendar.HOUR_OF_DAY, effectiveHour)
                                 cal.set(java.util.Calendar.MINUTE, effectiveMinute)
                                 cal.set(java.util.Calendar.SECOND, 0)
+                                cal.set(java.util.Calendar.MILLISECOND, 0)
                                 cal.timeInMillis
                             }
                             1 -> {
+                                // Mañana: día siguiente con la hora seleccionada
                                 val cal = java.util.Calendar.getInstance()
                                 cal.add(java.util.Calendar.DAY_OF_YEAR, 1)
                                 cal.set(java.util.Calendar.HOUR_OF_DAY, effectiveHour)
                                 cal.set(java.util.Calendar.MINUTE, effectiveMinute)
                                 cal.set(java.util.Calendar.SECOND, 0)
+                                cal.set(java.util.Calendar.MILLISECOND, 0)
                                 cal.timeInMillis
                             }
                             2 -> {
+                                // 7 días: una semana después con la hora seleccionada
                                 val cal = java.util.Calendar.getInstance()
                                 cal.add(java.util.Calendar.DAY_OF_YEAR, 7)
                                 cal.set(java.util.Calendar.HOUR_OF_DAY, effectiveHour)
                                 cal.set(java.util.Calendar.MINUTE, effectiveMinute)
                                 cal.set(java.util.Calendar.SECOND, 0)
+                                cal.set(java.util.Calendar.MILLISECOND, 0)
                                 cal.timeInMillis
                             }
                             3 -> {
-                                // Aplicar hora al customDeadlineMillis
+                                // Fecha personalizada: aplicar hora al customDeadlineMillis
                                 customDeadlineMillis?.let { millis ->
                                     val cal = java.util.Calendar.getInstance()
                                     cal.timeInMillis = millis
                                     cal.set(java.util.Calendar.HOUR_OF_DAY, effectiveHour)
                                     cal.set(java.util.Calendar.MINUTE, effectiveMinute)
                                     cal.set(java.util.Calendar.SECOND, 0)
+                                    cal.set(java.util.Calendar.MILLISECOND, 0)
                                     cal.timeInMillis
                                 }
                             }
