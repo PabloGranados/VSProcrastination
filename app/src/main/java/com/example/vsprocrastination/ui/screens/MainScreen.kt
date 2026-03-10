@@ -1241,7 +1241,7 @@ private fun CalibrationView(
             } else {
                 // Resultado mostrado: confirmar
                 Button(
-                    onClick = { viewModel.skipCalibration() }, // Ya se guardó en stopCalibration
+                    onClick = { viewModel.confirmCalibration() },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.White,
                         contentColor = MaterialTheme.colorScheme.tertiary
@@ -1463,16 +1463,7 @@ private fun TaskDialog(
     var isQuickTask by remember { mutableStateOf(initialIsQuickTask) }
     var hasDeadline by remember { mutableStateOf(initialDeadlineMillis != null) }
     var deadlineOption by remember { mutableIntStateOf(
-        if (initialDeadlineMillis == null) 0
-        else {
-            val hoursUntil = (initialDeadlineMillis - System.currentTimeMillis()) / (1000 * 60 * 60)
-            when {
-                hoursUntil <= 24 -> 0
-                hoursUntil <= 48 -> 1
-                hoursUntil <= 168 -> 2
-                else -> 3
-            }
-        }
+        if (initialDeadlineMillis == null) 0 else 3
     ) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -1491,8 +1482,22 @@ private fun TaskDialog(
     var subtaskList by remember { mutableStateOf(initialSubtasks.toMutableList()) }
     var newSubtaskText by remember { mutableStateOf("") }
     
+    // DatePicker espera millis en UTC a medianoche. Convertir deadlineMillis local → UTC.
+    val datePickerInitialMillis = remember(initialDeadlineMillis) {
+        val sourceMillis = initialDeadlineMillis ?: System.currentTimeMillis()
+        val localCal = java.util.Calendar.getInstance().apply { timeInMillis = sourceMillis }
+        val utcCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+        utcCal.set(java.util.Calendar.YEAR, localCal.get(java.util.Calendar.YEAR))
+        utcCal.set(java.util.Calendar.MONTH, localCal.get(java.util.Calendar.MONTH))
+        utcCal.set(java.util.Calendar.DAY_OF_MONTH, localCal.get(java.util.Calendar.DAY_OF_MONTH))
+        utcCal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        utcCal.set(java.util.Calendar.MINUTE, 0)
+        utcCal.set(java.util.Calendar.SECOND, 0)
+        utcCal.set(java.util.Calendar.MILLISECOND, 0)
+        utcCal.timeInMillis
+    }
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = initialDeadlineMillis ?: System.currentTimeMillis()
+        initialSelectedDateMillis = datePickerInitialMillis
     )
     val timePickerState = rememberTimePickerState(
         initialHour = selectedHour,

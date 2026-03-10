@@ -106,7 +106,7 @@ class TaskReminderWorker(
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 "${WORK_TAG_NAGGING}_$taskId",
-                ExistingPeriodicWorkPolicy.REPLACE,
+                ExistingPeriodicWorkPolicy.KEEP,
                 request
             )
         }
@@ -244,6 +244,25 @@ class TaskReminderWorker(
         // ===== HORAS DE SILENCIO (22:00 - 7:59) =====
         val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         if (currentHour >= 22 || currentHour < 8) {
+            // Para recordatorios one-shot (escalonados de deadline), reprogramar
+            // a las 8:00 AM del día siguiente en vez de perder la notificación
+            if (type == TYPE_GENTLE || type == TYPE_PERSISTENT) {
+                val nextMorning = java.util.Calendar.getInstance().apply {
+                    if (currentHour >= 22) add(java.util.Calendar.DAY_OF_YEAR, 1)
+                    set(java.util.Calendar.HOUR_OF_DAY, 8)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                }
+                val delay = nextMorning.timeInMillis - System.currentTimeMillis()
+                if (delay > 0 && taskId > 0) {
+                    val retryRequest = OneTimeWorkRequestBuilder<TaskReminderWorker>()
+                        .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+                        .setInputData(inputData)
+                        .addTag("deadline_retry_${taskId}")
+                        .build()
+                    WorkManager.getInstance(applicationContext).enqueue(retryRequest)
+                }
+            }
             return Result.success()
         }
 

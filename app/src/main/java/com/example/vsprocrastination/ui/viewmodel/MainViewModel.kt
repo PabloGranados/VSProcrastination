@@ -286,7 +286,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Programa recordatorios insistentes para tareas vencidas.
      * Solo si el usuario tiene nagging habilitado.
      * También CANCELA nagging para tareas que ya no lo necesitan.
+     * 
+     * IMPORTANTE: Usa KEEP en vez de REPLACE para no reiniciar el timer
+     * de 3h cada vez que se actualiza la lista de tareas.
+     * Solo programa nagging para tareas NUEVAS (no programadas aún).
      */
+    private val _scheduledNaggingIds = mutableSetOf<Long>()
+    
     private fun scheduleOverdueReminders(tasks: List<Task>) {
         viewModelScope.launch {
             val naggingEnabled = preferencesManager.naggingEnabled.first()
@@ -307,11 +313,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .filter { it.id !in overdueIds }
                 .forEach { task ->
                     TaskReminderWorker.cancelNaggingReminder(context, task.id)
+                    _scheduledNaggingIds.remove(task.id)
                 }
             
-            // Programar nagging para las que sí necesitan
+            // Programar nagging solo para tareas NUEVAS que aún no tienen nagging activo
             overdueNeedingNagging.forEach { task ->
-                TaskReminderWorker.scheduleNaggingReminder(context, task.name, task.id)
+                if (task.id !in _scheduledNaggingIds) {
+                    TaskReminderWorker.scheduleNaggingReminder(context, task.name, task.id)
+                    _scheduledNaggingIds.add(task.id)
+                }
             }
         }
     }
@@ -574,13 +584,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     /**
      * Llamado cuando la app pasa a background durante modo enfoque.
-     * Envía un broadcast al AppLeaveDetector.
+     * Solo envía broadcast si la pantalla sigue encendida (el usuario
+     * cambió de app). Si la pantalla está apagada, el usuario simplemente
+     * bloqueó/apagó el dispositivo — no es una "salida" real.
      */
     fun onAppPaused() {
         if (_uiState.value.isInFocusMode) {
-            val intent = android.content.Intent(AppLeaveDetector.ACTION_APP_LEFT)
-            intent.setPackage(context.packageName)
-            context.sendBroadcast(intent)
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            if (powerManager.isInteractive) {
+                // Pantalla encendida → el usuario realmente salió de la app
+                val intent = android.content.Intent(AppLeaveDetector.ACTION_APP_LEFT)
+                intent.setPackage(context.packageName)
+                context.sendBroadcast(intent)
+            }
+            // Si la pantalla está apagada, no hacer nada:
+            // el FocusService sigue corriendo y la notificación muestra el timer
         }
     }
     
@@ -642,6 +660,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     /**
      * Detiene la calibración y determina el nivel basado en el tiempo medido.
+     * Deja la vista de calibración abierta para mostrar el resultado.
      */
     fun stopCalibration() {
         calibrationJob?.cancel()
@@ -660,7 +679,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         
         _uiState.update { it.copy(
-            showCalibrationMode = false,
+            showCalibrationMode = true,
             isCalibrationRunning = false,
             calibrationElapsedMillis = elapsed,
             pomodoroLevel = recommendedLevel,
@@ -679,6 +698,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             showCalibrationMode = false,
             isCalibrationRunning = false,
             calibrationElapsedMillis = 0
+        )}
+    }
+    
+    /**
+     * Confirma la calibración completada, cierra la vista y muestra mensaje de éxito.
+     */
+    fun confirmCalibration() {
+        val level = _uiState.value.pomodoroLevel
+        _uiState.update { it.copy(
+            showCalibrationMode = false,
+            isCalibrationRunning = false,
+            snackbarMessage = "🎯 ¡Calibración exitosa! Modo: ${level.label} (${level.focusMinutes} min enfoque / ${level.breakRecommendation} descanso)"
         )}
     }
     

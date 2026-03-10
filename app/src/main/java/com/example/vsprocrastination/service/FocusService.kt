@@ -99,7 +99,17 @@ class FocusService : Service() {
                 stopSelf()
             }
             ACTION_COMPLETE -> {
-                stopTimer()
+                // Marcar como completada para que el ViewModel registre la sesión
+                _timerState.value = TimerState(
+                    remainingMillis = 0,
+                    totalMillis = totalDurationMillis,
+                    taskName = taskName,
+                    taskId = taskId,
+                    isComplete = true
+                )
+                timerJob?.cancel()
+                _isRunning.value = false
+                showCompletionNotification()
                 stopSelf()
             }
         }
@@ -181,8 +191,9 @@ class FocusService : Service() {
                 "Modo Enfoque",
                 NotificationManager.IMPORTANCE_LOW // Sin sonido, pero siempre visible
             ).apply {
-                description = "Mantiene el timer de enfoque activo"
+                description = "Timer de enfoque activo — visible en pantalla de bloqueo"
                 setShowBadge(true)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             
             val manager = getSystemService(NotificationManager::class.java)
@@ -193,7 +204,9 @@ class FocusService : Service() {
     private fun buildNotification(remainingMillis: Long): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this, 0,
-            Intent(this, MainActivity::class.java),
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
@@ -203,28 +216,48 @@ class FocusService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
+        val completeIntent = PendingIntent.getService(
+            this, 2,
+            Intent(this, FocusService::class.java).apply { action = ACTION_COMPLETE },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        
         val progressPercent = ((1 - remainingMillis.toFloat() / totalDurationMillis) * 100).toInt()
+        val totalMinutes = (totalDurationMillis / 60000).toInt()
+        val remainMinutes = (remainingMillis / 60000).toInt()
+        val remainSeconds = ((remainingMillis % 60000) / 1000).toInt()
+        val timeText = String.format("%02d:%02d", remainMinutes, remainSeconds)
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("🔒 Modo Enfoque: $taskName")
-            .setContentText("Sesión de enfoque en progreso")
+            .setContentTitle("🔒 $taskName")
+            .setContentText("⏱ $timeText restantes · Sesión de $totalMinutes min")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                "⏱ $timeText restantes\n" +
+                "📊 Progreso: $progressPercent% completado\n" +
+                "🍅 Sesión de $totalMinutes minutos\n\n" +
+                "💡 No necesitas abrir la app — el timer sigue aquí."
+            ))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pendingIntent)
-            .setOngoing(true) // No se puede deslizar para descartar
+            .setOngoing(true)
             .setSilent(true)
-            // Cronómetro live nativo del sistema — cuenta regresiva visible
-            // aunque el usuario salga de la app (API 24+)
             .setUsesChronometer(true)
             .setChronometerCountDown(true)
             .setWhen(System.currentTimeMillis() + remainingMillis)
             .setShowWhen(true)
             .addAction(
                 R.drawable.ic_launcher_foreground,
-                "Detener",
+                "⏹ Detener",
                 stopIntent
+            )
+            .addAction(
+                R.drawable.ic_launcher_foreground,
+                "✅ Completar",
+                completeIntent
             )
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setProgress(100, progressPercent, false)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
     }
     

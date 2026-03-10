@@ -1,18 +1,53 @@
 # VS Procrastination
 
-**v2.5.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.6.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
 
 ## Descargar APK
 
-📲 **[Descargar VS Procrastination v2.5.0](releases/VS-Procrastination-v2.5.0.apk)**
+📲 **[Descargar VS Procrastination v2.6.0](releases/VS-Procrastination-v2.6.0.apk)**
 
 > Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
 
-## Novedades en v2.5.0
+## Novedades en v2.6.0
 
-### 🍅 Sistema Pomodoro Progresivo — Calibración + niveles adaptativos
+### 🐛 Corrección de bugs críticos
+
+- **Fechas se movían al editar tareas**: al editar una tarea con deadline, la fecha podía cambiar sola. Se corrigió la lógica de opciones de fecha para usar siempre el modo personalizado al editar.
+- **DatePicker mostraba día incorrecto**: el Material3 DatePicker trabaja en UTC pero recibía millis locales, causando desfase de ±1 día. Ahora se convierte correctamente local→UTC.
+- **Días restantes incorrectos por DST**: `calendarDaysUntil` usaba división de millis que fallaba en cambios de horario. Ahora usa comparación por YEAR + DAY_OF_YEAR.
+- **Notificaciones nagging se reiniciaban**: cada vez que se reprogramaba el nagging, el timer de 3h se reseteaba. Se añadió tracking con `_scheduledNaggingIds` y política `KEEP` para no reprogramar las que ya están activas.
+- **Recordatorios one-shot perdidos en horario nocturno**: si un recordatorio GENTLE/PERSISTENT se disparaba en horas de silencio (22:00–7:59), se descartaba. Ahora se reprograma automáticamente a las 8:00 AM del día siguiente.
+- **Mensaje de calibración faltante**: al completar la calibración del Pomodoro, no aparecía ningún feedback. Se añadió `confirmCalibration()` con snackbar "🎯 ¡Calibración exitosa!" mostrando nivel, tiempo de enfoque y descanso.
+
+### 🔕 AppLeaveDetector menos agresivo
+
+- **Apagar pantalla ya no activa la alerta**: se detectaba erróneamente que el usuario salió de la app al apagar el dispositivo. Ahora se verifica `PowerManager.isInteractive` antes de enviar el broadcast.
+- Canal cambiado de NAGGING (alta prioridad) a canal normal
+- Título más amigable: "🔙 Tu sesión sigue activa" (antes "⚠️ ¡Saliste de la app!")
+- Prioridad MAX→DEFAULT, categoría ALARM→REMINDER
+- Vibración reducida: triple patrón agresivo → pulso suave de 300ms
+- Ahora es dismissable (antes era ONGOING, no se podía quitar)
+
+### 🔒 Notificación de timer visible en pantalla de bloqueo
+
+- **Timer completo en la notificación**: la notificación del Modo Enfoque ahora muestra el nombre de la tarea, tiempo restante (MM:SS), progreso (%) y duración de la sesión.
+- **Botón "✅ Completar"**: permite marcar la sesión como completada directamente desde la notificación, sin abrir la app.
+- **Visibilidad en lock screen**: `VISIBILITY_PUBLIC` para que el timer sea legible sin desbloquear.
+- Texto expandido: "No necesitas abrir la app — el timer sigue aquí"
+
+### 🏗️ Archivos modificados
+- **Task.kt**: `calendarDaysUntil` con epoch day comparison
+- **MainScreen.kt**: deadline option siempre=3 al editar, DatePicker UTC fix, calibración llama a `confirmCalibration()`
+- **MainViewModel.kt**: `_scheduledNaggingIds` Set, `confirmCalibration()`, `onAppPaused()` con `isInteractive` check
+- **TaskReminderWorker.kt**: `KEEP` policy para nagging, rescheduling a 8AM en horas de silencio
+- **AppLeaveDetector.kt**: canal normal, prioridad reducida, dismissable
+- **FocusService.kt**: notificación con task info + timer + Complete button + VISIBILITY_PUBLIC
+
+## Novedades anteriores
+
+### 🍅 Sistema Pomodoro Progresivo — Calibración + niveles adaptativos (v2.5.0)
 
 **El Pomodoro ya no es "25 min para todos".** El nuevo sistema mide tu capacidad real de concentración y te asigna un nivel personalizado que evoluciona contigo.
 
@@ -428,6 +463,19 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 - `WAKE_LOCK` — WorkManager interno
 ## Changelog
 
+### v2.6.0 (junio 2026)
+- **Fix**: fechas se movían al editar tareas (deadline option siempre personalizado)
+- **Fix**: DatePicker mostraba día incorrecto (conversión local→UTC)
+- **Fix**: días restantes incorrectos en cambio de horario (epoch day comparison)
+- **Fix**: nagging se reiniciaba al reprogramar (KEEP policy + tracking Set)
+- **Fix**: recordatorios one-shot perdidos en horas de silencio (reschedule a 8AM)
+- **Fix**: calibración Pomodoro sin feedback (nuevo `confirmCalibration()` con snackbar)
+- **Fix**: apagar pantalla disparaba alerta de "saliste de la app" (check `isInteractive`)
+- AppLeaveDetector: canal normal, prioridad reducida, dismissable, vibración suave
+- FocusService: notificación con nombre de tarea, timer MM:SS, progreso %, botón Completar
+- Notificación del timer visible en pantalla de bloqueo (VISIBILITY_PUBLIC)
+- versionCode 10 → 11, versionName 2.5.0 → 2.6.0
+
 ### v2.5.0 (marzo 2026)
 - **Sistema Pomodoro progresivo**: calibración inicial + 7 niveles adaptativos
 - Cronómetro ascendente de calibración para medir foco natural del usuario
@@ -574,7 +622,7 @@ Para generar el APK de release:
 El APK se genera en `app/build/outputs/apk/release/`. Cópialo a la carpeta `releases/` y renómbralo:
 
 ```bash
-cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.5.0.apk
+cp app/build/outputs/apk/release/app-release.apk releases/VS-Procrastination-v2.6.0.apk
 ```
 
 Para el APK de debug (con firma automática):

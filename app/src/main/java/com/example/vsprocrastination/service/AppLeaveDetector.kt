@@ -62,19 +62,19 @@ class AppLeaveDetector : BroadcastReceiver() {
         
         val selectedMessage = messages.random()
         
-        val notification = NotificationCompat.Builder(context, TaskReminderWorker.NAGGING_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, TaskReminderWorker.CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("⚠️ ¡Saliste de la app!")
+            .setContentTitle("🔙 Tu sesión sigue activa")
             .setContentText(selectedMessage)
             .setStyle(NotificationCompat.BigTextStyle().bigText(
                 "$selectedMessage\n\nTu sesión de enfoque para \"$taskName\" sigue activa."
             ))
             .setContentIntent(openIntent)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setVibrate(longArrayOf(0, 500, 200, 500, 200, 500))
-            .setAutoCancel(false)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVibrate(longArrayOf(0, 300))
             .build()
         
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

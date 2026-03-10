@@ -131,24 +131,43 @@ data class Task(
         } else ""
         
         // Calcular diferencia en DÍAS CALENDARIO (zona horaria local)
+        // Usa get(DAY_OF_YEAR) + YEAR para evitar problemas con DST
         val calendarDaysUntil = run {
             val nowCal = java.util.Calendar.getInstance().apply { timeInMillis = currentTimeMillis }
-            // Truncar ambas fechas a medianoche para comparar solo días
-            val nowMidnight = java.util.Calendar.getInstance().apply {
-                timeInMillis = currentTimeMillis
-                set(java.util.Calendar.HOUR_OF_DAY, 0)
-                set(java.util.Calendar.MINUTE, 0)
-                set(java.util.Calendar.SECOND, 0)
-                set(java.util.Calendar.MILLISECOND, 0)
+            val deadlineCal2 = java.util.Calendar.getInstance().apply { timeInMillis = deadline }
+            
+            // Comparar por año y día del año para inmunidad a DST
+            val nowYear = nowCal.get(java.util.Calendar.YEAR)
+            val deadlineYear = deadlineCal2.get(java.util.Calendar.YEAR)
+            val nowDayOfYear = nowCal.get(java.util.Calendar.DAY_OF_YEAR)
+            val deadlineDayOfYear = deadlineCal2.get(java.util.Calendar.DAY_OF_YEAR)
+            
+            if (nowYear == deadlineYear) {
+                deadlineDayOfYear - nowDayOfYear
+            } else {
+                // Para años diferentes, calcular usando epoch days
+                val nowEpochDay = nowCal.let { c ->
+                    val m = java.util.Calendar.getInstance().apply {
+                        timeInMillis = c.timeInMillis
+                        set(java.util.Calendar.HOUR_OF_DAY, 12) // mediodía evita DST
+                        set(java.util.Calendar.MINUTE, 0)
+                        set(java.util.Calendar.SECOND, 0)
+                        set(java.util.Calendar.MILLISECOND, 0)
+                    }
+                    m.timeInMillis / (24 * 60 * 60 * 1000L)
+                }
+                val deadlineEpochDay = deadlineCal2.let { c ->
+                    val m = java.util.Calendar.getInstance().apply {
+                        timeInMillis = c.timeInMillis
+                        set(java.util.Calendar.HOUR_OF_DAY, 12)
+                        set(java.util.Calendar.MINUTE, 0)
+                        set(java.util.Calendar.SECOND, 0)
+                        set(java.util.Calendar.MILLISECOND, 0)
+                    }
+                    m.timeInMillis / (24 * 60 * 60 * 1000L)
+                }
+                (deadlineEpochDay - nowEpochDay).toInt()
             }
-            val deadlineMidnight = java.util.Calendar.getInstance().apply {
-                timeInMillis = deadline
-                set(java.util.Calendar.HOUR_OF_DAY, 0)
-                set(java.util.Calendar.MINUTE, 0)
-                set(java.util.Calendar.SECOND, 0)
-                set(java.util.Calendar.MILLISECOND, 0)
-            }
-            ((deadlineMidnight.timeInMillis - nowMidnight.timeInMillis) / (24 * 60 * 60 * 1000L)).toInt()
         }
         
         return when {
