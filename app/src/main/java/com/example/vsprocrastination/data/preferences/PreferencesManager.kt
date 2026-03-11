@@ -36,6 +36,10 @@ class PreferencesManager(private val context: Context) {
         val SYNC_ENABLED_KEY = booleanPreferencesKey("sync_enabled")
         val LAST_SYNC_TIMESTAMP_KEY = longPreferencesKey("last_sync_timestamp")
         
+        // App Blocker
+        val APP_BLOCKING_ENABLED_KEY = booleanPreferencesKey("app_blocking_enabled")
+        val BLOCKED_APPS_KEY = stringSetPreferencesKey("blocked_apps")
+        
         // Defaults
         const val DEFAULT_POMODORO_MINUTES = 25
         const val DEFAULT_DARK_MODE = "system"
@@ -172,6 +176,34 @@ class PreferencesManager(private val context: Context) {
     suspend fun setLastSyncTimestamp(timestamp: Long = System.currentTimeMillis()) {
         context.dataStore.edit { prefs ->
             prefs[LAST_SYNC_TIMESTAMP_KEY] = timestamp
+        }
+    }
+    
+    // --- App Blocker ---
+    val appBlockingEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[APP_BLOCKING_ENABLED_KEY] ?: false
+    }
+    
+    suspend fun setAppBlockingEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[APP_BLOCKING_ENABLED_KEY] = enabled
+        }
+    }
+    
+    val blockedApps: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[BLOCKED_APPS_KEY] ?: emptySet()
+    }
+    
+    suspend fun setBlockedApps(packages: Set<String>) {
+        context.dataStore.edit { prefs ->
+            prefs[BLOCKED_APPS_KEY] = packages
+        }
+    }
+    
+    suspend fun toggleBlockedApp(packageName: String, blocked: Boolean) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[BLOCKED_APPS_KEY] ?: emptySet()
+            prefs[BLOCKED_APPS_KEY] = if (blocked) current + packageName else current - packageName
         }
     }
 }

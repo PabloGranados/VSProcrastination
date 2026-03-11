@@ -9,6 +9,11 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- Bloqueo de apps durante Pomodoro -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="false"
@@ -41,6 +46,25 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Focus timer for productivity tracking" />
         </service>
+        
+        <!-- Foreground Service para bloqueo de apps durante Pomodoro -->
+        <service
+            android:name=".service.AppBlockerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="App blocker during focus sessions to prevent distractions" />
+        </service>
+        
+        <!-- Activity overlay que aparece sobre apps bloqueadas -->
+        <activity
+            android:name=".service.BlockOverlayActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.VSProcrastination"
+            android:taskAffinity=".overlay" />
         
         <!-- BroadcastReceiver para detectar salida de la app -->
         <receiver

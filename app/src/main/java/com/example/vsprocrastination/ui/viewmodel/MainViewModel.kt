@@ -27,6 +27,9 @@ import com.example.vsprocrastination.service.FocusService
 import com.example.vsprocrastination.service.SmartNotificationWorker
 import com.example.vsprocrastination.service.TaskReminderWorker
 import com.example.vsprocrastination.service.TimerState
+import com.example.vsprocrastination.service.AppBlockerManager
+import com.example.vsprocrastination.service.AppBlockerService
+import com.example.vsprocrastination.service.BlockableApp
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -71,7 +74,14 @@ data class MainUiState(
     val isExportImportInProgress: Boolean = false,
     val exportImportMessage: String? = null,
     // Hábitos (para mapa de calor)
-    val habitCompletionsByDay: Map<String, List<String>> = emptyMap()
+    val habitCompletionsByDay: Map<String, List<String>> = emptyMap(),
+    // App Blocker
+    val appBlockingEnabled: Boolean = false,
+    val blockedApps: Set<String> = emptySet(),
+    val blockableApps: List<BlockableApp> = emptyList(),
+    val hasUsageStatsPermission: Boolean = false,
+    val hasOverlayPermission: Boolean = false,
+    val isBlockerActive: Boolean = false
 )
 
 /**
@@ -85,6 +95,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val habitRepository = HabitRepository(database.habitDao())
     private val exportImportManager = ExportImportManager(database.taskDao(), database.subtaskDao(), database.habitDao())
     val preferencesManager = PreferencesManager(application)
+    val appBlockerManager = AppBlockerManager(application)
     private val context: Context get() = getApplication()
     
     private val _uiState = MutableStateFlow(MainUiState())
@@ -98,6 +109,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         observeHabitData()
         observeFocusService()
         observePreferences()
+        observeAppBlocker()
         initializeNotifications()
     }
     
@@ -257,6 +269,67 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             preferencesManager.pomodoroIsCustom.collect { custom ->
                 _uiState.update { it.copy(pomodoroIsCustom = custom) }
             }
+        }
+    }
+    
+    /**
+     * Observa el estado del App Blocker (preferencias + permisos + estado activo).
+     */
+    private fun observeAppBlocker() {
+        viewModelScope.launch {
+            preferencesManager.appBlockingEnabled.collect { enabled ->
+                _uiState.update { it.copy(appBlockingEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            preferencesManager.blockedApps.collect { apps ->
+                _uiState.update { it.copy(blockedApps = apps) }
+            }
+        }
+        viewModelScope.launch {
+            AppBlockerManager.isBlockerActive.collect { active ->
+                _uiState.update { it.copy(isBlockerActive = active) }
+            }
+        }
+    }
+    
+    /**
+     * Refresca el estado de permisos del blocker (llamar al volver de Settings del sistema).
+     */
+    fun refreshBlockerPermissions() {
+        _uiState.update {
+            it.copy(
+                hasUsageStatsPermission = appBlockerManager.hasUsageStatsPermission(),
+                hasOverlayPermission = appBlockerManager.hasOverlayPermission()
+            )
+        }
+    }
+    
+    /**
+     * Carga la lista de apps instaladas bloqueables.
+     */
+    fun loadBlockableApps() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val apps = appBlockerManager.getBlockableApps()
+            _uiState.update { it.copy(blockableApps = apps) }
+        }
+    }
+    
+    /**
+     * Toggle de una app en la blocklist.
+     */
+    fun toggleBlockedApp(packageName: String, blocked: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.toggleBlockedApp(packageName, blocked)
+        }
+    }
+    
+    /**
+     * Habilita/deshabilita el bloqueo de apps durante Pomodoro.
+     */
+    fun setAppBlockingEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setAppBlockingEnabled(enabled)
         }
     }
     

@@ -1,18 +1,64 @@
 # VS Procrastination
 
-**v2.6.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
+**v2.7.0** — App Android para dejar de procrastinar. Usa principios de psicología conductual para que dejes de postergar y empieces a hacer las cosas.
 
 No es otra lista de tareas. La app decide por ti qué hacer primero, te acompaña mientras lo haces y te molesta si no lo haces.
 
 ## Descargar APK
 
-📲 **[Descargar VS Procrastination v2.6.0](releases/VS-Procrastination-v2.6.0.apk)**
+📲 **[Descargar VS Procrastination v2.7.0](releases/VS-Procrastination-v2.7.0.apk)**
 
 > Para instalar: descarga el APK → abre el archivo → permite la instalación desde fuentes desconocidas si tu dispositivo lo pide → listo.
 
-## Novedades en v2.6.0
+## Novedades en v2.7.0
 
-### 🐛 Corrección de bugs críticos
+### 🛡️ Bloqueo de Apps durante sesiones de enfoque
+
+**Nuevo sistema de bloqueo de aplicaciones** para eliminar distracciones durante las sesiones Pomodoro. Basado en la 4ta Ley de Atomic Habits de James Clear: "Hazlo difícil" — si acceder a la distracción requiere esfuerzo, es menos probable que caigas.
+
+#### Cómo funciona
+- Al iniciar una sesión de enfoque, las apps que hayas configurado como bloqueadas se vuelven **inaccesibles**
+- Si intentas abrir una app bloqueada, aparece una **pantalla de intervención** con escudo animado y frase motivacional
+- Un **cooldown de 10 segundos** antes de poder desbloquear manualmente — diseñado para activar el Sistema 2 (Kahneman) y darte tiempo para reconsiderar
+- Al finalizar la sesión, el bloqueo se desactiva automáticamente
+
+#### Pantalla de configuración
+- **Lista de apps instaladas** con barra de búsqueda
+- **Apps sugeridas**: Instagram, TikTok, YouTube, Twitter/X, Facebook, WhatsApp, Telegram, Snapchat, Reddit, Pinterest, Discord, Netflix, Prime Video, Spotify, Twitch y Chrome
+- Toggle maestro para activar/desactivar el bloqueo
+- Tarjeta de permisos con acceso directo a la configuración del sistema
+
+#### Permisos requeridos
+- `PACKAGE_USAGE_STATS` — para detectar qué app está en primer plano (requiere concesión manual en Ajustes del sistema)
+- `SYSTEM_ALERT_WINDOW` — para mostrar la pantalla de bloqueo sobre otras apps
+
+#### Enfoque científico
+- **Fricción Ambiental (James Clear)**: añadir fricción a las distracciones reduce su uso hasta un 76%
+- **Pre-Commitment Strategy (Dan Ariely)**: comprometerte antes de la tentación es más efectivo que resistir en el momento
+- **Flow State Protection (Csikszentmihalyi)**: cada interrupción requiere ~23 minutos para recuperar el estado de flujo (UC Irvine, 2008)
+- **Ego Depletion (Baumeister)**: la fuerza de voluntad es un recurso finito — eliminar la tentación es mejor que resistirla
+
+#### Diseño empático
+- La pantalla de bloqueo no castiga: motiva con frases como "Tu yo del futuro te agradecerá este momento"
+- El botón de desbloqueo aparece tras el cooldown — respeta tu autonomía pero te da una pausa para reflexionar
+- Diseño no punitivo inspirado en el modelo de intervención de hábitos de Nir Eyal
+
+### 🏗️ Archivos nuevos y modificados
+- **AppBlockerManager.kt**: gestor de permisos, lista de apps bloqueables, apps sugeridas de distracción
+- **AppBlockerService.kt**: Foreground Service que monitorea la app en primer plano cada 1.5s vía UsageStatsManager
+- **BlockOverlayActivity.kt**: pantalla de intervención con escudo animado, frases motivacionales y cooldown de 10s
+- **BlockedAppsScreen.kt**: pantalla Compose para configurar apps bloqueadas con búsqueda y sugerencias
+- **PreferencesManager.kt**: nuevas preferencias `appBlockingEnabled` y `blockedApps` (StringSet)
+- **FocusService.kt**: integración del bloqueador — inicia al empezar sesión, se detiene al completar/cancelar
+- **MainViewModel.kt**: estado del bloqueador, permisos, lista de apps, toggles
+- **SettingsScreen.kt**: nueva sección "Bloqueo de Apps" con navegación a la pantalla de configuración
+- **MainActivity.kt**: nueva ruta `"blocked_apps"` con refresco de permisos al volver de Ajustes
+- **AndroidManifest.xml**: permisos, registro de servicio y actividad overlay
+- versionCode 11 → 12, versionName 2.6.0 → 2.7.0
+
+## Novedades anteriores
+
+### 🐛 Corrección de bugs críticos + mejoras (v2.6.0)
 
 - **Fechas se movían al editar tareas**: al editar una tarea con deadline, la fecha podía cambiar sola. Se corrigió la lógica de opciones de fecha para usar siempre el modo personalizado al editar.
 - **DatePicker mostraba día incorrecto**: el Material3 DatePicker trabaja en UTC pero recibía millis locales, causando desfase de ±1 día. Ahora se convierte correctamente local→UTC.
@@ -90,10 +136,6 @@ No es otra lista de tareas. La app decide por ti qué hacer primero, te acompañ
 - **MainScreen**: CalibrationView (cronómetro ascendente fullscreen), BreakSuggestionDialog, LevelUpDialog
 - **SettingsScreen**: sección Pomodoro rediseñada con tabla de niveles, personalización y recalibración
 - **FocusModeView**: muestra nivel actual y descanso recomendado durante la sesión
-
-## Novedades anteriores
-
-### 🔔 Reingeniería del sistema de notificaciones (v2.4.0)
 
 ### 🔔 Reingeniería del sistema de notificaciones — Menos intrusivo, más inteligente (v2.4.0)
 
@@ -308,6 +350,10 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 | Planning Fallacy (Kahneman) | Reflexión nocturna para planificar el día siguiente |
 | Atomic Habits (James Clear) | Habit Tracker con checkboxes diarios y rachas por hábito |
 | Tiny Habits (B.J. Fogg) | Celebración visual inmediata al completar un hábito |
+| Fricción Ambiental (James Clear) | Bloqueo de apps durante sesiones — hacer la distracción difícil reduce su uso |
+| Pre-Commitment Strategy (Ariely) | Configurar apps bloqueadas antes de la sesión — comprometerse antes de la tentación |
+| Flow State Protection (Csikszentmihalyi) | El bloqueador protege el estado de flujo evitando interrupciones (~23 min para recuperarlo) |
+| Ego Depletion (Baumeister) | Eliminar la tentación es mejor que resistirla — el bloqueo ahorra fuerza de voluntad |
 
 ## Features
 
@@ -345,6 +391,18 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 - Alertas de deadline inminente (<4 horas) con motivación contextual
 - Datos científicos integrados en cada notificación (Steel, Pychyl, Baumeister, Gollwitzer, Kahneman)
 - **Reprogramación completa tras reinicio**: BootReceiver reprograma todos los recordatorios escalonados, nagging y workers periódicos
+
+### Bloqueo de Apps
+
+- **Bloqueo automático** de apps configuradas al iniciar una sesión de enfoque
+- Detección de app en primer plano cada 1.5 segundos vía UsageStatsManager
+- **Pantalla de intervención**: escudo animado + frase motivacional aleatoria (8 frases)
+- **Cooldown de 10 segundos** antes de poder desbloquear — pausa para reflexionar
+- Desbloqueo automático al finalizar la sesión
+- **16 apps sugeridas**: Instagram, TikTok, YouTube, Twitter/X, Facebook, WhatsApp, Telegram, Snapchat, Reddit, Pinterest, Discord, Netflix, Prime Video, Spotify, Twitch, Chrome
+- Búsqueda de apps instaladas con filtro en tiempo real
+- Toggle maestro para activar/desactivar todo el sistema
+- Guía integrada para conceder permisos especiales del sistema
 
 ### Rachas y motivación
 
@@ -389,6 +447,7 @@ Score = (Urgencia x 2) + (Dificultad x 1.5) + (Prioridad x 2.5) + Bonus Zeigarni
 - Export/Import JSON para respaldo y transferencia de datos (Storage Access Framework)
 - WorkManager 2.9 para notificaciones programadas y workers periódicos
 - Foreground Service con cronómetro nativo para el timer
+- UsageStatsManager + SYSTEM_ALERT_WINDOW para bloqueo de apps durante sesiones
 - Navigation Compose 2.8 para navegación entre pantallas
 - DataStore Preferences 1.1 para configuración del usuario
 - MVVM con StateFlow + combine
@@ -426,6 +485,9 @@ app/src/main/java/com/example/vsprocrastination/
 │   └── PomodoroLevel.kt         # 7 niveles progresivos + calibración + progresión
 ├── service/
 │   ├── FocusService.kt          # Foreground Service (Pomodoro + cronómetro nativo)
+│   ├── AppBlockerManager.kt     # Gestor de permisos y apps bloqueables
+│   ├── AppBlockerService.kt     # Foreground Service que monitorea app en primer plano
+│   ├── BlockOverlayActivity.kt  # Pantalla de intervención con cooldown de 10s
 │   ├── TaskReminderWorker.kt    # WorkManager (recordatorios escalonados 24h/4h/1h + nagging 3h)
 │   ├── SmartNotificationWorker.kt # Notificaciones circadianas (4h, máx 3/día)
 │   ├── DeadlineCountdownWorker.kt # Countdown <30min estilo Duolingo
@@ -436,14 +498,15 @@ app/src/main/java/com/example/vsprocrastination/
 │   │   ├── MainScreen.kt        # Pantalla principal + CalibrationView + BreakDialog + LevelUpDialog
 │   │   ├── HabitTrackerScreen.kt # Pantalla de hábitos diarios
 │   │   ├── ContributionCalendar.kt # Mapa de calor de actividad (tareas + hábitos)
-│   │   ├── SettingsScreen.kt    # Configuración (Pomodoro progresivo + padding adaptativo)
+│   │   ├── SettingsScreen.kt    # Configuración (Pomodoro progresivo + bloqueo de apps)
+│   │   ├── BlockedAppsScreen.kt # Configuración de apps bloqueadas
 │   │   └── WeeklySummaryScreen.kt # Resumen semanal (padding adaptativo)
 │   ├── viewmodel/
 │   │   ├── MainViewModel.kt     # Estado central de la app
 │   │   └── HabitViewModel.kt    # Estado del Habit Tracker
 │   └── theme/
 │       └── Theme.kt             # Tema Material 3 con soporte dark mode
-└── MainActivity.kt              # NavHost con 4 rutas
+└── MainActivity.kt              # NavHost con 5 rutas
 ```
 
 ## Build
@@ -457,11 +520,25 @@ Requiere Android Studio Ladybug o superior. minSdk 24, targetSdk 36.
 ## Permisos
 
 - `POST_NOTIFICATIONS` — recordatorios y countdown
-- `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_SPECIAL_USE` — timer del Modo Enfoque
+- `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_SPECIAL_USE` — timer del Modo Enfoque y bloqueador de apps
 - `VIBRATE` — notificaciones nagging y countdown
 - `RECEIVE_BOOT_COMPLETED` — reprogramar workers tras reinicio
 - `WAKE_LOCK` — WorkManager interno
+- `PACKAGE_USAGE_STATS` — detectar app en primer plano para el bloqueador (concesión manual en Ajustes del sistema)
+- `SYSTEM_ALERT_WINDOW` — mostrar pantalla de bloqueo sobre otras apps
 ## Changelog
+
+### v2.7.0 (junio 2026)
+- **Bloqueo de Apps**: nuevo sistema para bloquear aplicaciones distractoras durante sesiones Pomodoro
+- AppBlockerManager: gestor de permisos (UsageStats + Overlay) y lista de apps bloqueables
+- AppBlockerService: Foreground Service que detecta app en primer plano cada 1.5s
+- BlockOverlayActivity: pantalla de intervención con escudo animado, frases motivacionales y cooldown de 10s
+- BlockedAppsScreen: pantalla de configuración con búsqueda, sugerencias y toggle maestro
+- Integración con FocusService: bloqueo automático al iniciar sesión, desbloqueo al finalizar
+- 16 apps de distracción sugeridas (redes sociales, streaming, mensajería)
+- Nuevos permisos: PACKAGE_USAGE_STATS y SYSTEM_ALERT_WINDOW
+- Nueva sección "Bloqueo de Apps" en Ajustes con cita de James Clear
+- versionCode 11 → 12, versionName 2.6.0 → 2.7.0
 
 ### v2.6.0 (junio 2026)
 - **Fix**: fechas se movían al editar tareas (deadline option siempre personalizado)

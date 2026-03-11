@@ -20,6 +20,7 @@ import com.example.vsprocrastination.ui.screens.HabitTrackerScreen
 import com.example.vsprocrastination.ui.screens.MainScreen
 import com.example.vsprocrastination.ui.screens.SettingsScreen
 import com.example.vsprocrastination.ui.screens.WeeklySummaryScreen
+import com.example.vsprocrastination.ui.screens.BlockedAppsScreen
 import com.example.vsprocrastination.ui.theme.VSProcrastinationTheme
 import com.example.vsprocrastination.ui.viewmodel.MainViewModel
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -89,7 +90,8 @@ class MainActivity : ComponentActivity() {
                             onImportClick = {
                                 importLauncher.launch(arrayOf("application/json", "*/*"))
                             },
-                            onDismissExportImportMessage = { viewModel.dismissExportImportMessage() }
+                            onDismissExportImportMessage = { viewModel.dismissExportImportMessage() },
+                            onNavigateToBlockedApps = { navController.navigate("blocked_apps") }
                         )
                     }
                     composable("weekly_summary") {
@@ -101,6 +103,26 @@ class MainActivity : ComponentActivity() {
                     }
                     composable("habits") {
                         HabitTrackerScreen(
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
+                    composable("blocked_apps") {
+                        // Refrescar permisos y cargar apps al entrar
+                        androidx.compose.runtime.LaunchedEffect(Unit) {
+                            viewModel.refreshBlockerPermissions()
+                            viewModel.loadBlockableApps()
+                        }
+                        
+                        BlockedAppsScreen(
+                            blockableApps = uiState.blockableApps,
+                            blockedPackages = uiState.blockedApps,
+                            hasUsageStatsPermission = uiState.hasUsageStatsPermission,
+                            hasOverlayPermission = uiState.hasOverlayPermission,
+                            appBlockingEnabled = uiState.appBlockingEnabled,
+                            onToggleApp = { pkg, blocked -> viewModel.toggleBlockedApp(pkg, blocked) },
+                            onToggleBlocking = { enabled -> viewModel.setAppBlockingEnabled(enabled) },
+                            onRequestUsageStatsPermission = { viewModel.appBlockerManager.requestUsageStatsPermission() },
+                            onRequestOverlayPermission = { viewModel.appBlockerManager.requestOverlayPermission() },
                             onBack = { navController.popBackStack() }
                         )
                     }
@@ -119,6 +141,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Limpiar notificación de "vuelve a la app"
         viewModel.onAppResumed()
+        // Refrescar permisos del blocker (el usuario puede volver de Settings del sistema)
+        viewModel.refreshBlockerPermissions()
     }
     
     private fun requestNotificationPermission() {

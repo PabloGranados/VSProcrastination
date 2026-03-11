@@ -45,7 +45,9 @@ fun SettingsScreen(
     exportImportMessage: String? = null,
     onExportClick: () -> Unit = {},
     onImportClick: () -> Unit = {},
-    onDismissExportImportMessage: () -> Unit = {}
+    onDismissExportImportMessage: () -> Unit = {},
+    // App Blocker
+    onNavigateToBlockedApps: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     
@@ -284,6 +286,27 @@ fun SettingsScreen(
                 }
             }
             
+            // === BLOQUEO DE APPS ===
+            SettingsSection(title = "🛡️ Bloqueo de Apps") {
+                Text(
+                    text = "Bloquea apps de distracción automáticamente cuando inicias una sesión Pomodoro.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "💡 \"Haz los malos hábitos difíciles\" — James Clear, Atomic Habits",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onNavigateToBlockedApps,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("🛡️ Configurar apps bloqueadas")
+                }
+            }
+            
             // === APARIENCIA ===
             SettingsSection(title = "🎨 Apariencia") {
                 Text("Tema", style = MaterialTheme.typography.bodyMedium)
@@ -452,7 +475,10 @@ fun SettingsScreen(
                                 "• Técnica Pomodoro (Cirillo)\n" +
                                 "• Don't Break the Chain (Seinfeld)\n" +
                                 "• Self-Determination Theory (Deci & Ryan)\n" +
-                                "• Priming Psicológico (Bargh)",
+                                "• Priming Psicológico (Bargh)\n" +
+                                "• Fricción Ambiental (Clear, Atomic Habits)\n" +
+                                "• Pre-Commitment Strategy (Ariely)\n" +
+                                "• Flow State Protection (Csikszentmihalyi)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onTertiaryContainer
                     )

@@ -9,10 +9,12 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.example.vsprocrastination.MainActivity
 import com.example.vsprocrastination.R
+import com.example.vsprocrastination.data.preferences.PreferencesManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 
 /**
  * FocusService - Foreground Service para el modo Deep Work.
@@ -93,8 +95,10 @@ class FocusService : Service() {
                 val durationMinutes = intent.getIntExtra(EXTRA_DURATION_MINUTES, 25)
                 totalDurationMillis = durationMinutes * 60 * 1000L
                 startTimer()
+                startAppBlockerIfEnabled()
             }
             ACTION_STOP -> {
+                AppBlockerService.stopBlocking(this)
                 stopTimer()
                 stopSelf()
             }
@@ -109,11 +113,29 @@ class FocusService : Service() {
                 )
                 timerJob?.cancel()
                 _isRunning.value = false
+                AppBlockerService.stopBlocking(this)
                 showCompletionNotification()
                 stopSelf()
             }
         }
         return START_STICKY
+    }
+    
+    /**
+     * Inicia el AppBlockerService si el usuario tiene el bloqueo habilitado
+     * y ha configurado apps para bloquear.
+     */
+    private fun startAppBlockerIfEnabled() {
+        serviceScope.launch {
+            val prefs = PreferencesManager(this@FocusService)
+            val blockingEnabled = prefs.appBlockingEnabled.first()
+            val blockedApps = prefs.blockedApps.first()
+            val manager = AppBlockerManager(this@FocusService)
+            
+            if (blockingEnabled && blockedApps.isNotEmpty() && manager.hasAllPermissions()) {
+                AppBlockerService.startBlocking(this@FocusService)
+            }
+        }
     }
     
     private fun startTimer() {
@@ -146,6 +168,7 @@ class FocusService : Service() {
                         taskId = taskId,
                         isComplete = true
                     )
+                    AppBlockerService.stopBlocking(this@FocusService)
                     showCompletionNotification()
                     _isRunning.value = false
                     stopSelf()
